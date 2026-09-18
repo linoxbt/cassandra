@@ -100,13 +100,10 @@ CATEGORY_SPORTS = "sports"
 CATEGORY_PAGEVIEWS = "pageviews"
 CATEGORIES = (CATEGORY_CRYPTO, CATEGORY_NEWS, CATEGORY_WEATHER, CATEGORY_SPORTS, CATEGORY_PAGEVIEWS)
 
-# Wikimedia answers 403 to a request with no User-Agent and asks callers to
-# identify themselves, so this one source is fetched with a header.
-SOURCE_HEADERS = {
-    CATEGORY_PAGEVIEWS: {
-        "User-Agent": "Cassandra/1.0 (GenLayer intelligent contract; +https://github.com/linoxbt/cassandra)",
-    },
-}
+# Wikimedia answers 403 to a request that does not identify its caller, and it is
+# not the only host that does. Every fetch carries this, including a challenger's
+# evidence, so a citation never fails for a reason unrelated to the claim.
+USER_AGENT = "Cassandra/1.0 (GenLayer intelligent contract; +https://github.com/linoxbt/cassandra)"
 
 MAX_QUESTION_CHARS = 300
 MAX_CRITERIA_CHARS = 700
@@ -1126,10 +1123,8 @@ def _judge(
     neither are the raw bytes, which differ between two callers of a live feed a
     second apart."""
 
-    headers = SOURCE_HEADERS.get(category, {})
-
     def leader_fn():
-        body = _fetch(url, headers)
+        body = _fetch(url)
         digest = hashlib.sha256(body).hexdigest()
         evidence = body.decode("utf-8", "replace")[:MAX_EVIDENCE_CHARS]
         challenge_block = ""
@@ -1191,8 +1186,8 @@ def _judge(
     return gl.vm.run_nondet_unsafe(leader_fn, validator_fn)
 
 
-def _fetch(url: str, headers: dict = {}) -> bytes:
-    res = gl.nondet.web.get(url, headers=headers) if headers else gl.nondet.web.get(url)
+def _fetch(url: str) -> bytes:
+    res = gl.nondet.web.get(url, headers={"User-Agent": USER_AGENT})
     status = int(res.status)
     if status == 429 or status >= 500:
         raise gl.vm.UserError(f"{ERROR_TRANSIENT} evidence source unavailable ({status})")

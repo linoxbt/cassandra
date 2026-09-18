@@ -119,3 +119,30 @@ def test_the_positions_contract_reads_the_status_live_not_from_a_pushed_flag(h, 
     h.acting_as(ALICE, on=POSITIONS_ADDR)
     with pytest.raises(UserError, match="frozen"):
         h.positions.transfer(market, "YES", BOB, GEN)
+
+
+def test_every_evidence_fetch_identifies_itself(h):
+    """Wikimedia answers 403 to an anonymous request and it is not the only host
+    that does, so a missing User-Agent would look like a dead source."""
+    market = h.open_market()
+    h.warp(3700)
+    h.resolve(market)
+    assert h.gl.nondet.web.headers, "no fetch was recorded"
+    for sent in h.gl.nondet.web.headers:
+        assert "Cassandra" in sent.get("User-Agent", ""), sent
+
+
+def test_a_challenger_url_is_fetched_the_same_way(h):
+    market = h.open_market()
+    h.bet(market, "yes", GEN, sender=ALICE)
+    h.warp(3700)
+    h.resolve(market)
+    h.serve("https://wikimedia.org/some/citation", 200, '{"items":[]}')
+    h.acting_as(BOB, 10**17)
+    h.market.dispute(market, "https://wikimedia.org/some/citation", "My reading differs.")
+    h.queue_verdict(VERDICT_NO)
+    h.acting_as(BOB)
+    assert h.market.arbitrate(market) == "NO"
+    assert "https://wikimedia.org/some/citation" in h.gl.nondet.web.fetches
+    for sent in h.gl.nondet.web.headers:
+        assert "Cassandra" in sent.get("User-Agent", "")

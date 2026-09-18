@@ -132,6 +132,10 @@ class CassandraPositions(gl.Contract):
         return False
 
     def _market_is_open(self, market_id: int) -> bool:
+        if self.market == Address(bytes(20)):
+            # Nothing can be open before the ledger knows which market it serves,
+            # and calling into the zero address would fail less legibly.
+            raise gl.vm.UserError(f"{ERROR_EXPECTED} The market contract is not set yet")
         status = gl.get_contract_at(self.market).view().get_status(u256(market_id))
         return str(status) == STATUS_OPEN
 
