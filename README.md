@@ -101,14 +101,27 @@ Studio Network is gasless, so neither account needs funding there.
 ```sh
 cd agent && npm install
 CASSANDRA_PW=<a passphrase> npm run setup     # creates two encrypted keystores
+CASSANDRA_PW=<same> npm run fund              # Studio's faucet, over RPC
 CASSANDRA_PW=<same> npm run deploy            # deploys both, wires them, verifies both
 ```
+
+Gasless does not mean free: Studio charges no gas, but seeding a market and
+placing a bet both send real value, so both accounts need a balance. `npm run
+fund` calls `sim_fundAccount` — the same faucet the Studio UI puts behind the
+droplet. On Asimov, fund the deployer at
+[testnet-faucet.genlayer.foundation](https://testnet-faucet.genlayer.foundation)
+instead; it is behind a browser challenge and cannot be automated.
 
 `deploy.mjs` deploys `positions` first, then `cassandra` pointing at it, then
 points `positions` back. It proves both constructors ran and both links took with
 view calls before recording anything, and writes the addresses straight into
 `frontend/src/lib/contractAddresses.ts` — not into a `.env` the build may never
 read.
+
+It is also resumable. Studio's write quota is shared per IP and can run out
+between one transaction and the next; each of the four steps is recorded as it
+lands, so a run that deployed the ledger and then hit the limit picks up where it
+stopped instead of orphaning it and deploying a second one.
 
 ### The agent
 
