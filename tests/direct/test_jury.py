@@ -166,3 +166,42 @@ def test_claiming_before_the_jury_is_finalized_is_refused(contract, direct_vm, m
     direct_vm.sender = direct_alice
     with direct_vm.expect_revert("not been finalized"):
         contract.claim_jury(market)
+
+
+def test_a_forfeited_bond_on_a_market_with_no_jury_is_not_stranded(contract, direct_vm, market, direct_bob):
+    """A dispute bond forfeited on a market nobody sat on has no juror to pay.
+    Left in the bonded pool it would be stuck forever, because `claim_jury` is the
+    only way out and there is nobody who can call it."""
+    _resolve(contract, direct_vm, market)
+    warp_to(direct_vm, "2026-09-18T20:00:00Z")
+    direct_vm.sender = direct_bob
+    direct_vm.value = 2 * GEN
+    contract.dispute(market, "https://www.coindesk.com/price/bitcoin", "I disagree.")
+    direct_vm.value = 0
+    direct_vm.mock_web(r".*coindesk\.com.*", {"status": 200, "body": "{}"})
+    assert contract.arbitrate(market) == "YES"  # upheld, so the bond is forfeited
+    assert contract.solvency()["jury_bonded"] == str(2 * GEN)
+    contract.finalize_jury(market)
+    # It leaves the bonded pool and lands somewhere with a withdrawal path.
+    assert contract.solvency()["jury_bonded"] == "0"
+    assert contract.solvency()["fees"] == str(2 * GEN)
+
+
+def test_a_forfeited_bond_goes_whole_to_the_one_juror_who_was_right(
+    contract, direct_vm, market, direct_alice, direct_bob
+):
+    _stake(contract, direct_vm, market, direct_alice, "yes", GEN)
+    _resolve(contract, direct_vm, market)
+    warp_to(direct_vm, "2026-09-18T20:00:00Z")
+    direct_vm.sender = direct_bob
+    direct_vm.value = 2 * GEN
+    contract.dispute(market, "https://www.coindesk.com/price/bitcoin", "I disagree.")
+    direct_vm.value = 0
+    direct_vm.mock_web(r".*coindesk\.com.*", {"status": 200, "body": "{}"})
+    contract.arbitrate(market)
+    assert contract.get_market(market)["status"] == "FINAL"
+    contract.finalize_jury(market)
+    direct_vm.sender = direct_alice
+    # The single right juror takes their bond plus the whole forfeited pot.
+    assert int(contract.claim_jury(market)) == GEN + 2 * GEN
+    assert contract.solvency()["jury_bonded"] == "0"

@@ -180,3 +180,75 @@ def test_every_wei_is_accounted_for_across_a_busy_market(h):
     handed_out = sum(h.paid_to(w) for w in (ALICE, BOB, CAROL, AGENT, OWNER))
     assert handed_out == taken - h.balance()
     assert h.balance() < 10  # nothing but rounding dust
+
+
+def test_the_running_counters_never_drift_from_the_ledgers(h):
+    """Incremental counters are only worth having if they stay true. This drives a
+    full lifecycle and checks them against the numbers recomputed from scratch."""
+    U = type(h.market.next_id)
+
+    def recomputed():
+        escrow = bonds = live = settled = volume = 0
+        last = int(h.market.next_id) - 1
+        for mid in range(1, last + 1):
+            m = h.market.markets.get(U(mid))
+            if m is None:
+                continue
+            pool = int(m.yes_pool) + int(m.no_pool)
+            volume += pool
+            escrow += max(0, pool - int(m.paid_atto) - int(m.refunded_atto))
+            if str(m.status) in ("FINAL", "VOID"):
+                settled += 1
+            else:
+                live += 1
+            d = h.market.disputes.get(U(mid))
+            if d is not None and not bool(d.disposed):
+                bonds += int(d.bond_atto)
+        return {"escrow": escrow, "bonds": bonds, "live": live, "settled": settled, "volume": volume}
+
+    def check(where):
+        want = recomputed()
+        solvency = h.solvency()
+        h.acting_as(OWNER)
+        stats = h.market.stats()
+        assert solvency["market_escrow"] == str(want["escrow"]), f"escrow at {where}"
+        assert solvency["open_dispute_bonds"] == str(want["bonds"]), f"bonds at {where}"
+        assert stats["live"] == str(want["live"]), f"live at {where}"
+        assert stats["settled"] == str(want["settled"]), f"settled at {where}"
+        assert stats["volume"] == str(want["volume"]), f"volume at {where}"
+
+    first = h.open_market(seed=2 * GEN)
+    check("one open market")
+    h.bet(first, "yes", 3 * GEN, sender=ALICE)
+    h.bet(first, "no", 5 * GEN, sender=BOB)
+    check("after bets")
+
+    second = h.open_market(seed=2 * GEN, sender=ALICE)
+    check("a second, publicly opened market")
+
+    h.warp(3700)
+    h.resolve(first)
+    check("resolved")
+
+    h.acting_as(BOB, GEN)
+    h.market.dispute(first, "https://example.org/proof", "Wrong.")
+    check("disputed")
+
+    h.serve("https://example.org/proof", 200, "{}")
+    h.queue_verdict(VERDICT_YES)
+    h.acting_as(BOB)
+    h.market.arbitrate(first)
+    check("arbitrated and final")
+
+    h.claim(first, sender=ALICE)
+    h.claim(first, sender=AGENT)
+    check("claimed out")
+
+    h.resolve(second, verdict=VERDICT_UNRESOLVED)
+    check("second market voided")
+    h.claim(second, sender=ALICE)
+    check("refunded")
+
+    # Only the first came from the agent; the second came from a wallet.
+    h.acting_as(OWNER)
+    assert h.market.stats()["agent_opened"] == "1"

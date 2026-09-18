@@ -264,6 +264,13 @@ class Cassandra(gl.Contract):
     jury_index: TreeMap[u256, str]
     bets: TreeMap[str, Bet]
 
+    live_count: u256
+    settled_count: u256
+    agent_count: u256
+    volume_atto: u256
+    escrow_atto: u256
+    open_bond_atto: u256
+
     jury_pool_atto: u256
     jury_paid_atto: u256
     jury_reward_pot: TreeMap[u256, u256]
@@ -297,6 +304,12 @@ class Cassandra(gl.Contract):
         self.protocol_fee_bps = u256(_cfg_int(cfg, "protocol_fee_bps", 0, 1000))
         self.allow_public_markets = bool(cfg.get("allow_public_markets", True))
         self.next_id = u256(1)
+        self.live_count = u256(0)
+        self.settled_count = u256(0)
+        self.agent_count = u256(0)
+        self.volume_atto = u256(0)
+        self.escrow_atto = u256(0)
+        self.open_bond_atto = u256(0)
         self.jury_pool_atto = u256(0)
         self.jury_paid_atto = u256(0)
         self.fees_atto = u256(0)
@@ -355,7 +368,14 @@ class Cassandra(gl.Contract):
         if market.status == STATUS_OPEN and self._now() >= int(market.closes_at):
             market.status = STATUS_CLOSED
 
+    def _reached_terminal(self) -> None:
+        """A market has left the live set for good. Counted here rather than
+        recomputed, so `stats` and `solvency` stay O(1) as history grows."""
+        self.live_count = u256(max(0, int(self.live_count) - 1))
+        self.settled_count = u256(int(self.settled_count) + 1)
+
     def _void(self, market: Market, reason: str) -> None:
+        self._reached_terminal()
         market.status = STATUS_VOID
         market.void_reason = reason[:200]
         Voided(str(int(market.id)), reason[:60]).emit()
@@ -470,6 +490,11 @@ class Cassandra(gl.Contract):
             void_reason="",
         )
         self.markets[u256(market_id)] = market
+        self.live_count = u256(int(self.live_count) + 1)
+        if by_agent:
+            self.agent_count = u256(int(self.agent_count) + 1)
+        self.volume_atto = u256(int(self.volume_atto) + seed)
+        self.escrow_atto = u256(int(self.escrow_atto) + seed)
         self._mint(market, SIDE_YES, sender, half, "seed-yes")
         self._mint(market, SIDE_NO, sender, half, "seed-no")
         MarketOpened(
@@ -494,6 +519,8 @@ class Cassandra(gl.Contract):
             market.yes_pool = u256(int(market.yes_pool) + amount)
         else:
             market.no_pool = u256(int(market.no_pool) + amount)
+        self.volume_atto = u256(int(self.volume_atto) + amount)
+        self.escrow_atto = u256(int(self.escrow_atto) + amount)
         seq = int(market.bet_count) + 1
         market.bet_count = u256(seq)
         self._mint(market, chosen, sender, amount, f"bet-{seq}")
@@ -604,6 +631,7 @@ class Cassandra(gl.Contract):
             overturned=False,
         )
         market.status = STATUS_DISPUTED
+        self.open_bond_atto = u256(int(self.open_bond_atto) + bond)
         Disputed(
             str(int(market_id)), gl.message.sender_address.as_hex.lower(),
             bond=str(bond), url=_url(evidence_url),
@@ -640,6 +668,7 @@ class Cassandra(gl.Contract):
         challenge.disposed = True
         challenge.overturned = overturned
         bond = int(challenge.bond_atto)
+        self.open_bond_atto = u256(max(0, int(self.open_bond_atto) - bond))
         if overturned:
             self._pay(challenge.disputer, bond)
         else:
@@ -656,6 +685,7 @@ class Cassandra(gl.Contract):
             if winner_pool <= 0:
                 self._void(market, "no position was taken on the winning side")
             else:
+                self._reached_terminal()
                 market.status = STATUS_FINAL
         Arbitrated(
             str(int(market_id)), final,
@@ -678,6 +708,7 @@ class Cassandra(gl.Contract):
         verdict = self.verdicts[market.id]
         if self._now() <= int(verdict.dispute_deadline):
             raise gl.vm.UserError(f"{ERROR_EXPECTED} The dispute window for market {int(market.id)} is still open")
+        self._reached_terminal()
         market.status = STATUS_FINAL
 
     @gl.public.write
@@ -697,6 +728,7 @@ class Cassandra(gl.Contract):
                 # The challenger's bond returns: arbitration never ran, so the
                 # dispute was never tested and cannot be judged frivolous.
                 challenge.disposed = True
+                self.open_bond_atto = u256(max(0, int(self.open_bond_atto) - int(challenge.bond_atto)))
                 self._pay(challenge.disputer, int(challenge.bond_atto))
                 self._void(market, "arbitration did not run before its deadline")
                 return
@@ -735,6 +767,7 @@ class Cassandra(gl.Contract):
         net = gross - fee
         self.claimed[key] = u256(gross)
         market.paid_atto = u256(int(market.paid_atto) + gross)
+        self.escrow_atto = u256(max(0, int(self.escrow_atto) - gross))
         self.fees_atto = u256(int(self.fees_atto) + fee)
         self._positions().emit(on="accepted").burn(
             f"burn:{int(market_id)}:{sender.as_hex.lower()}", u256(int(market_id)),
@@ -763,6 +796,7 @@ class Cassandra(gl.Contract):
             raise gl.vm.UserError(f"{ERROR_EXPECTED} Refund would exceed the pool of market {mid}")
         self.claimed[key] = u256(total)
         market.refunded_atto = u256(int(market.refunded_atto) + total)
+        self.escrow_atto = u256(max(0, int(self.escrow_atto) - total))
         if yes > 0:
             self._positions().emit(on="accepted").burn(
                 f"burn:{mid}:{sender.as_hex.lower()}:YES", u256(mid), SIDE_YES, sender, u256(yes),
@@ -828,9 +862,19 @@ class Cassandra(gl.Contract):
             raise gl.vm.UserError(f"{ERROR_EXPECTED} This jury is already finalized")
         self.jury_finalized[u256(mid)] = True
         if market.status == STATUS_VOID:
-            # Nothing was proven either way, so nothing is slashed.
+            # Nothing was proven either way, so nothing is slashed; bonds are
+            # returned in full. The sweep below is defensive: no path currently
+            # reaches VOID while carrying a forfeited dispute bond (voiding a
+            # disputed market refunds the bond, because a dispute that was never
+            # arbitrated cannot be judged frivolous), but a future stage that
+            # forfeits earlier must not be able to strand it here.
             self.jury_right_bond[u256(mid)] = u256(0)
-            JurySettled(str(mid), voided="1").emit()
+            stranded = int(self.jury_reward_pot.get(u256(mid), u256(0)))
+            if stranded > 0:
+                self.jury_paid_atto = u256(int(self.jury_paid_atto) + stranded)
+                self.fees_atto = u256(int(self.fees_atto) + stranded)
+                self.jury_reward_pot[u256(mid)] = u256(0)
+            JurySettled(str(mid), voided="1", stranded=str(stranded)).emit()
             return "0"
         outcome = str(self.verdicts[u256(mid)].outcome)
         roster = [p for p in str(self.jury_index.get(u256(mid), "")).split(",") if p]
@@ -850,12 +894,18 @@ class Cassandra(gl.Contract):
             # keeps their bond.
             slashed = 0
         self.jury_right_bond[u256(mid)] = u256(right_bond)
-        self.jury_reward_pot[u256(mid)] = u256(
-            int(self.jury_reward_pot.get(u256(mid), u256(0))) + slashed
-        )
+        pot = int(self.jury_reward_pot.get(u256(mid), u256(0))) + slashed
+        if right_bond <= 0 and pot > 0:
+            # A dispute bond forfeited on a market nobody sat on has no juror to
+            # pay. Left in the bonded pool it would be stranded, because
+            # `claim_jury` is the only way out and there is nobody to call it.
+            self.jury_paid_atto = u256(int(self.jury_paid_atto) + pot)
+            self.fees_atto = u256(int(self.fees_atto) + pot)
+            pot = 0
+        self.jury_reward_pot[u256(mid)] = u256(pot)
         JurySettled(
             str(mid), outcome=outcome, right_bond=str(right_bond),
-            wrong_bond=str(wrong_bond), slashed=str(slashed),
+            wrong_bond=str(wrong_bond), slashed=str(slashed), pot=str(pot),
         ).emit()
         return str(slashed)
 
@@ -1002,54 +1052,31 @@ class Cassandra(gl.Contract):
 
     @gl.public.view
     def solvency(self) -> dict:
-        """Every wei the contract holds, by the ledger it belongs to. Asserted in the
-        tests and shown in the app; the pools are summed over the open markets only."""
-        open_pools = 0
-        last = int(self.next_id) - 1
-        for mid in range(1, last + 1):
-            market = self.markets.get(u256(mid))
-            if market is None:
-                continue
-            spent = int(market.paid_atto) + int(market.refunded_atto)
-            open_pools += max(0, self._pool_total(market) - spent)
-        bonds = 0
-        for mid in range(1, last + 1):
-            challenge = self.disputes.get(u256(mid))
-            if challenge is not None and not bool(challenge.disposed):
-                bonds += int(challenge.bond_atto)
+        """Every wei the contract holds, by the ledger it belongs to. The four
+        never cross: the jury is paid only from bonds, fees only from payouts.
+
+        These are running counters rather than a scan, because a view that walks
+        every market ever opened gets slower every day the agent runs."""
         return {
-            "market_escrow": str(open_pools),
-            "open_dispute_bonds": str(bonds),
+            "market_escrow": str(int(self.escrow_atto)),
+            "open_dispute_bonds": str(int(self.open_bond_atto)),
             "jury_bonded": str(int(self.jury_pool_atto) - int(self.jury_paid_atto)),
             "fees": str(int(self.fees_atto)),
-            "market_count": str(last),
+            "market_count": str(int(self.next_id) - 1),
         }
 
     @gl.public.view
     def stats(self) -> dict:
-        last = int(self.next_id) - 1
-        volume = 0
-        open_count = 0
-        settled = 0
-        agent_count = 0
-        for mid in range(1, last + 1):
-            market = self.markets.get(u256(mid))
-            if market is None:
-                continue
-            volume += self._pool_total(market)
-            status = str(market.status)
-            if status == STATUS_OPEN:
-                open_count += 1
-            if status == STATUS_FINAL or status == STATUS_VOID:
-                settled += 1
-            if bool(market.by_agent):
-                agent_count += 1
+        """`live` counts markets that have not reached a terminal state, not
+        markets still trading: a market closes by the clock alone, so counting
+        "still trading" would need a scan. The app derives that from the list it
+        already has."""
         return {
-            "markets": str(last),
-            "open": str(open_count),
-            "settled": str(settled),
-            "agent_opened": str(agent_count),
-            "volume": str(volume),
+            "markets": str(int(self.next_id) - 1),
+            "live": str(int(self.live_count)),
+            "settled": str(int(self.settled_count)),
+            "agent_opened": str(int(self.agent_count)),
+            "volume": str(int(self.volume_atto)),
         }
 
     def _market_view(self, market: Market) -> dict:

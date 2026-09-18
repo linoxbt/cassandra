@@ -58,11 +58,38 @@ async function send(address, functionName, args, label) {
   return hash;
 }
 
-const positions = await deploy("positions.py", [], "positions");
-const market = await deploy("cassandra.py", [addr(agent.address), JSON.stringify(CONFIG)], "market");
+// Resumable. Studio's write quota is shared per IP and can run out between one
+// transaction and the next; without this, a run that got as far as deploying the
+// ledger and then failed would orphan it and deploy a second one on retry.
+const PROGRESS = path.join(STATE_DIR, `deploy-progress.${NETWORK}.json`);
+const progress = fs.existsSync(PROGRESS) ? JSON.parse(fs.readFileSync(PROGRESS, "utf8")) : {};
+const remember = (patch) => {
+  Object.assign(progress, patch);
+  fs.mkdirSync(STATE_DIR, { recursive: true });
+  fs.writeFileSync(PROGRESS, JSON.stringify(progress, null, 2) + "\n");
+};
 
-await send(market.address, "set_positions", [addr(positions.address)], "market.set_positions");
-await send(positions.address, "set_market", [addr(market.address)], "positions.set_market");
+async function once(key, label, run) {
+  if (progress[key]) {
+    console.log(`${label}: already done (${JSON.stringify(progress[key]).slice(0, 80)})`);
+    return progress[key];
+  }
+  const result = await run();
+  remember({ [key]: result });
+  return result;
+}
+
+const positions = await once("positions", "positions", () => deploy("positions.py", [], "positions"));
+const market = await once("market", "market", () =>
+  deploy("cassandra.py", [addr(agent.address), JSON.stringify(CONFIG)], "market"),
+);
+
+await once("set_positions", "market.set_positions", async () => ({
+  hash: await send(market.address, "set_positions", [addr(positions.address)], "market.set_positions"),
+}));
+await once("set_market", "positions.set_market", async () => ({
+  hash: await send(positions.address, "set_market", [addr(market.address)], "positions.set_market"),
+}));
 
 // "Deployed successfully" only means the transaction landed. Reading the state
 // back is the only thing that proves the constructors ran and the wiring took.
@@ -91,6 +118,8 @@ const record = {
   config,
 };
 saveJSON(path.join(STATE_DIR, `deployment.${NETWORK}.json`), record);
+// The run completed, so the resume file has nothing left to protect.
+fs.rmSync(PROGRESS, { force: true });
 
 // Written straight into the frontend rather than into a .env the build may not
 // pick up: an address that only reaches a local env file never reaches the app.

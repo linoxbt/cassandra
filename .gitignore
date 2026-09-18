@@ -10,3 +10,4 @@ gltest.config.yaml
 agent/state/*.keys.json
 agent/state/journal.log
 .DS_Store
+agent/state/deploy-progress.*.json
