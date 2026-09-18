@@ -145,10 +145,11 @@ def test_resolving_before_the_close_is_refused(contract, direct_vm, market):
         contract.resolve(market)
 
 
-def test_a_market_with_nobody_on_the_winning_side_voids(contract, direct_vm, market, agent, direct_alice):
-    # Only the seed is on YES; put weight on NO and resolve YES, then the reverse
-    # of the pathological case: a winning pool of zero cannot happen while the
-    # seed exists, which is exactly why the seed is there.
+def test_the_seed_guarantees_the_winning_side_always_has_a_claimant(contract, direct_vm, market, agent, direct_alice):
+    """A winning pool of zero would leave the whole escrow with nobody able to
+    claim it, which is why `resolve` voids in that case. The seed is what makes
+    it unreachable in practice: it puts the creator on both sides, so however
+    one-sided the betting gets, the winning side is never empty."""
     direct_vm.sender = direct_alice
     direct_vm.value = 5 * GEN
     contract.bet(market, "no")
