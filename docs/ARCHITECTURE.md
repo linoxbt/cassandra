@@ -48,6 +48,15 @@ arbitrary https URL the contract has no category for. Evidence that fails to loa
 for a reason unrelated to the claim is the worst kind of failure here, because it
 decides a dispute on a technicality.
 
+**0b. Every market settles on a date fixed when it opened.** `resolve` is open to
+anyone for the whole resolution window, so a market that reads "the current
+price" is settled by whoever picks the most flattering moment — a holder can
+simply watch and call it on a tick that suits them. Crypto markets therefore read
+CoinGecko's **daily snapshot for a named date**, not `simple/price`; weather,
+sports and pageviews were already pinned to a date or a window. The one exception
+is news, where "is this still being reported" is inherently relative to when it is
+asked — and is a judgement rather than a number in the first place.
+
 **1. The evidence URL is derived, never supplied.** `_evidence_url(category,
 source_query)` builds the URL from fields fixed when the market opened. Nobody
 can point the contract at a source of their choosing after seeing which way the

@@ -58,7 +58,7 @@ def config(**overrides) -> str:
 
 
 COINGECKO_BTC = json.dumps(
-    {"bitcoin": {"usd": 91250.42, "usd_24h_change": 2.1, "last_updated_at": NOW_TS}}
+    {"id": "bitcoin", "symbol": "btc", "market_data": {"current_price": {"usd": 91250.42}}}
 )
 
 VERDICT_YES = json.dumps(
@@ -76,8 +76,8 @@ def market_args(closes_at: int, **overrides) -> tuple:
     args = {
         "question": "Will BTC trade above $90,000 on 2026-09-19?",
         "category": "crypto",
-        "source_query": "bitcoin",
-        "criteria": "Resolves YES if the CoinGecko USD price for bitcoin is strictly above 90000 at settlement.",
+        "source_query": "bitcoin,19-09-2026",
+        "criteria": "Resolves YES if the CoinGecko daily USD price for bitcoin on 2026-09-19 is strictly above 90000.",
         "closes_at": closes_at,
         "rationale": "Opened by the predictor agent: 24h change is 2.1% and the threshold is within one move.",
     }

@@ -13,15 +13,20 @@
  */
 type Variant = "solid" | "outline" | "draw";
 
-const LEFT = "M23.4 3 C13.6 11.8 11 26.6 23.4 45 L23.4 3 Z";
-const RIGHT = "M24.6 3 C34.4 11.8 37 26.6 24.6 45 L24.6 3 Z";
+// Proportions matter more than detail here: the first draft was tall and narrow
+// and read as a dark splinter at 24px rather than as a leaf. This one is roughly
+// 32 wide to 38 tall, which still reads as a laurel leaf at favicon size.
+const LEFT = "M23.3 5 C11.5 14.5 8.5 28.5 23.3 43 L23.3 5 Z";
+const RIGHT = "M24.7 5 C36.5 14.5 39.5 28.5 24.7 43 L24.7 5 Z";
+// Kept inside the blade: the first pass ran past the leaf edge and read as
+// whiskers rather than veins.
 const VEINS = [
-  "M23.4 14 L16.6 12.2",
-  "M23.4 22 L15.2 21.4",
-  "M23.4 30 L17 31.6",
-  "M24.6 14 L31.4 12.2",
-  "M24.6 22 L32.8 21.4",
-  "M24.6 30 L31 31.6",
+  "M23.3 16 L18.4 14.2",
+  "M23.3 24 L15.6 23.4",
+  "M23.3 32 L18.0 33.2",
+  "M24.7 16 L29.6 14.2",
+  "M24.7 24 L32.4 23.4",
+  "M24.7 32 L30.0 33.2",
 ];
 
 export function LogoMark({
@@ -51,21 +56,21 @@ export function LogoMark({
         strokeLinejoin="round"
         fill={stroked ? "none" : "currentColor"}
       >
-        <path d={LEFT} className={variant === "draw" ? "leaf-half" : undefined} style={{ ["--dash" as string]: 120 }} />
-        <path d={RIGHT} className={variant === "draw" ? "leaf-half" : undefined} style={{ ["--dash" as string]: 120 }} />
+        <path d={LEFT} className={variant === "draw" ? "leaf-half" : undefined} style={{ ["--dash" as string]: 130 }} />
+        <path d={RIGHT} className={variant === "draw" ? "leaf-half" : undefined} style={{ ["--dash" as string]: 130 }} />
       </g>
       {/* The midrib: the rule that makes two readings binding. */}
       <path
-        d="M24 1.5 L24 46.5"
+        d="M24 5.5 L24 46"
         stroke="currentColor"
         strokeWidth={stroked ? 1.6 : 1.4}
         strokeLinecap="round"
         className={variant === "draw" ? "leaf-rib" : undefined}
-        style={{ ["--dash" as string]: 46 }}
+        style={{ ["--dash" as string]: 41 }}
       />
       <g stroke="currentColor" strokeWidth={0.9} strokeLinecap="round" opacity={stroked ? 0.75 : 0.28}>
         {VEINS.map((d) => (
-          <path key={d} d={d} className={variant === "draw" ? "leaf-vein" : undefined} style={{ ["--dash" as string]: 12 }} />
+          <path key={d} d={d} className={variant === "draw" ? "leaf-vein" : undefined} style={{ ["--dash" as string]: 14 }} />
         ))}
       </g>
     </svg>

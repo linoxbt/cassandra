@@ -50,25 +50,37 @@ async function show() {
 
 switch (step) {
   case "open": {
-    // A weather market: numeric, objective, and it settles within the hour.
-    const day = new Date(Date.now() + 86400_000).toISOString().slice(0, 10);
-    const query = `latitude=51.51&longitude=-0.13&daily=temperature_2m_max&start_date=${day}&end_date=${day}`;
-    const closes = nowSeconds() + Number(process.env.SMOKE_LIFETIME ?? 420);
+    // A market whose settlement date has already passed. The answer is therefore
+    // already determined, which makes the live run deterministic: it resolves in
+    // one consensus round, and the expected outcome is known in advance, so the
+    // run checks itself instead of just reporting whatever came back.
+    const day = new Date(Date.now() - 86400_000);
+    const pad = (n) => String(n).padStart(2, "0");
+    const date = `${pad(day.getUTCDate())}-${pad(day.getUTCMonth() + 1)}-${day.getUTCFullYear()}`;
+    const url = `https://api.coingecko.com/api/v3/coins/bitcoin/history?date=${date}&localization=false`;
+    const snapshot = await (await fetch(url, { headers: { "user-agent": "cassandra-smoke/0.1" } })).json();
+    const settled = Number(snapshot?.market_data?.current_price?.usd);
+    if (!Number.isFinite(settled)) throw new Error(`no settled price for ${date}; try again shortly`);
+    // Put the line well below the settled price, so the honest answer is YES.
+    const threshold = Math.floor(settled * 0.9);
+    const closes = nowSeconds() + Number(process.env.SMOKE_LIFETIME ?? 360);
+    console.log(`bitcoin settled at $${settled.toFixed(2)} on ${date}; line at $${threshold} -> expect YES`);
     const { tx } = await write(
       asAgent, market, "open_market",
       [
-        `Will the daily maximum temperature in London reach 18C on ${day}?`,
-        "weather", query,
-        `Resolves YES if daily.temperature_2m_max[0] in the Open-Meteo evidence feed is at least 18 for ${day}. ` +
-        `Resolves NO if it is lower. UNRESOLVED if the feed carries no maximum for that date.`,
+        `Was Bitcoin's daily price on ${date} above $${threshold.toLocaleString("en-US")}?`,
+        "crypto", `bitcoin,${date}`,
+        `Resolves YES if market_data.current_price.usd in the CoinGecko daily snapshot for ` +
+        `"bitcoin" on ${date} is strictly above ${threshold}. Resolves NO otherwise. ` +
+        `UNRESOLVED if the snapshot carries no USD price for that date.`,
         closes,
-        "Smoke run: a numeric market that settles inside one Studio rate-limit window.",
+        "Smoke run: settles on a date that has already passed, so the expected answer is known.",
       ],
       { value: 2n * 10n ** 16n, label: "open_market" },
     );
     const markets = await read(asAgent, market, "list_markets", [0, 5]);
     const id = markets[0]?.id;
-    save({ market_id: id, closes_at: closes, open_tx: tx?.hash ?? null });
+    save({ market_id: id, closes_at: closes, expect: "YES", settled, threshold, open_tx: tx?.hash ?? null });
     console.log(`opened market #${id}, closes ${new Date(closes * 1000).toISOString()}`);
     break;
   }
@@ -108,12 +120,20 @@ switch (step) {
     await write(asDeployer, market, "resolve", [Number(state.market_id)], { label: "resolve" });
     save({ resolved: true });
     await show();
+    const verdict = await read(asDeployer, market, "get_verdict", [Number(state.market_id)]);
+    if (state.expect && verdict.outcome !== state.expect) {
+      throw new Error(
+        `consensus answered ${verdict.outcome}, expected ${state.expect} ` +
+        `(settled $${state.settled}, line $${state.threshold}) - this is the run failing, not passing`,
+      );
+    }
+    console.log(`\nverdict ${verdict.outcome} matches the settled data. The contract read the evidence correctly.`);
     break;
   }
   case "dispute": {
     await write(
       asAgent, market, "dispute",
-      [Number(state.market_id), "https://api.open-meteo.com/v1/forecast?latitude=51.51&longitude=-0.13&daily=temperature_2m_max&timezone=UTC", "The forecast I read gives a different maximum."],
+      [Number(state.market_id), "https://api.coingecko.com/api/v3/coins/bitcoin/history?date=01-01-2026&localization=false", "The snapshot I read gives a different price."],
       { value: 10n ** 17n, label: "dispute" },
     );
     save({ disputed: true });

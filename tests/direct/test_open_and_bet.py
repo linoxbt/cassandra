@@ -19,7 +19,9 @@ def test_open_market_seeds_both_sides_and_mints_to_the_creator(contract, ledger,
 
 def test_evidence_url_is_derived_not_supplied(contract, market):
     view = contract.get_market(market)
-    assert view["evidence_url"].startswith("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin")
+    assert view["evidence_url"] == (
+        "https://api.coingecko.com/api/v3/coins/bitcoin/history?date=19-09-2026&localization=false"
+    )
 
 
 def test_bet_mints_positions_one_for_one_with_wei(contract, direct_vm, direct_alice, market, ledger):

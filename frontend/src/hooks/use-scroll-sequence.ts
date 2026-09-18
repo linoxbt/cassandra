@@ -21,7 +21,10 @@ export function useScrollSequence(
 
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (reduced) {
-      // No sequence: show every panel, stacked and readable.
+      // No sequence: show every panel, stacked and readable. The wrapper's
+      // inline height is one viewport per panel, which would otherwise leave a
+      // screen of dead space under the stack.
+      wrapper.style.height = "auto";
       panelRefs.current?.forEach((panel) => {
         if (!panel) return;
         panel.style.opacity = "1";

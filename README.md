@@ -56,11 +56,14 @@ everyone is refunded. That is a real outcome, not a failure.
 
 All five are keyless. The URL is derived by the contract from fields fixed when
 the market opened, so nobody can choose the source after seeing which way the
-money went.
+money went — and every market settles on a **named date**, so nobody can choose
+the moment either. `resolve` is open to anyone for the whole resolution window,
+so a market reading "the price right now" would be settled by whoever waited for
+the most flattering tick.
 
 | Category | Source | Shape of question |
 |---|---|---|
-| `crypto` | CoinGecko | will an asset trade past a threshold |
+| `crypto` | CoinGecko | was an asset's **daily snapshot for a named date** past a threshold |
 | `weather` | Open-Meteo | will a daily maximum reach a figure |
 | `sports` | TheSportsDB | will a named side win a named fixture |
 | `pageviews` | Wikimedia | will an article's readership spike past a line |

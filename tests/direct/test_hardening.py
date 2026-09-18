@@ -24,6 +24,28 @@ def test_the_source_query_cannot_redirect_the_fetch_to_another_host(contract, di
     direct_vm.value = 0
 
 
+def test_a_crypto_market_settles_on_a_named_date_not_on_spot(contract, direct_vm, agent):
+    """`simple/price` answers with whatever the market is doing at the moment of
+    the call, and `resolve` is open to anyone for the whole resolution window - so
+    a holder could wait for a tick that suits them. The date is fixed at open."""
+    direct_vm.sender = agent
+    direct_vm.value = 2 * GEN
+    market_id = contract.open_market(*market_args(NOW_TS + 3600, source_query="ethereum,01-10-2026"))
+    direct_vm.value = 0
+    url = contract.get_market(market_id)["evidence_url"]
+    assert "/coins/ethereum/history?date=01-10-2026" in url
+    assert "simple/price" not in url
+
+
+def test_a_malformed_crypto_query_is_refused(contract, direct_vm, agent):
+    direct_vm.sender = agent
+    for bad in ("bitcoin", "bitcoin,2026-09-19", "bitcoin,19-09-26", "BITCOIN,19-09-2026", "bitcoin,19-09-2026,extra"):
+        direct_vm.value = 2 * GEN
+        with direct_vm.expect_revert():
+            contract.open_market(*market_args(NOW_TS + 3600, source_query=bad))
+    direct_vm.value = 0
+
+
 def test_an_unknown_category_is_refused(contract, direct_vm, agent):
     direct_vm.sender = agent
     direct_vm.value = 2 * GEN
@@ -34,7 +56,7 @@ def test_an_unknown_category_is_refused(contract, direct_vm, agent):
 
 def test_every_supported_category_produces_a_fetchable_url(contract, direct_vm, agent):
     cases = {
-        "crypto": ("bitcoin", "api.coingecko.com"),
+        "crypto": ("bitcoin,19-09-2026", "api.coingecko.com"),
         "weather": ("latitude=52.52&longitude=13.41&daily=temperature_2m_max", "api.open-meteo.com"),
         "news": ("ceasefire", "api.gdeltproject.org"),
         "sports": ("2026-09-19", "thesportsdb.com"),

@@ -18,8 +18,13 @@ export const CATEGORIES = ["crypto", "news", "weather", "sports", "pageviews"];
 
 export function evidenceUrl(category, query) {
   switch (category) {
-    case "crypto":
-      return `https://api.coingecko.com/api/v3/simple/price?ids=${query}&vs_currencies=usd&include_24hr_change=true&include_last_updated_at=true`;
+    case "crypto": {
+      // `coin,DD-MM-YYYY` - the daily snapshot for a named date, never spot.
+      // `resolve` is open to anyone for the whole resolution window, so a market
+      // that reads the price "now" is settled by whoever picks the best moment.
+      const [coin, date] = String(query).split(",").map((part) => part.trim());
+      return `https://api.coingecko.com/api/v3/coins/${coin}/history?date=${date}&localization=false`;
+    }
     case "weather":
       return `https://api.open-meteo.com/v1/forecast?${query}&timezone=UTC`;
     case "news":
@@ -110,9 +115,26 @@ const isoDay = (offsetDays = 0) => {
 
 // -- crypto ----------------------------------------------------------------
 
+// The daily snapshot CoinGecko publishes for a named date, which is fixed once
+// that day is over. The market therefore has to close after it - a market that
+// closes before its own settlement date can only read a 404.
+const CRYPTO_SETTLE_DAY = 1;   // settle on tomorrow's snapshot
+const CRYPTO_MIN_CLOSE = 26 * 3600;
+
+function dmy(offsetDays = 0) {
+  const d = new Date(Date.now() + offsetDays * 86400_000);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${pad(d.getUTCDate())}-${pad(d.getUTCMonth() + 1)}-${d.getUTCFullYear()}`;
+}
+
 async function cryptoCandidates(closesAt) {
   const ids = COINS.map(([id]) => id).join(",");
-  const data = await fetchJson(evidenceUrl("crypto", ids));
+  // Spot is only used to place the threshold; it is never what settles.
+  const data = await fetchJson(
+    `https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd&include_24hr_change=true`,
+  );
+  const settleDate = dmy(CRYPTO_SETTLE_DAY);
+  const settles = Math.max(closesAt, Math.floor(Date.now() / 1000) + CRYPTO_MIN_CLOSE);
   const out = [];
   for (const [id, label] of COINS) {
     const row = data?.[id];
@@ -126,16 +148,22 @@ async function cryptoCandidates(closesAt) {
     const threshold = roundNicely(price * (1 + (up ? move : -move)));
     out.push({
       category: "crypto",
-      source_query: id,
-      question: `Will ${label} trade ${up ? "above" : "below"} $${threshold.toLocaleString("en-US")} by ${stamp(closesAt)}?`,
+      source_query: `${id},${settleDate}`,
+      question: `Will ${label}'s daily price on ${settleDate} be ${up ? "above" : "below"} $${threshold.toLocaleString("en-US")}?`,
       criteria:
-        `Resolves YES if the CoinGecko USD price for "${id}" is strictly ` +
-        `${up ? "above" : "below"} ${threshold} at settlement, read from the evidence feed. ` +
-        `Resolves NO otherwise. UNRESOLVED if the feed does not carry a usable price for "${id}".`,
+        `Resolves YES if market_data.current_price.usd in the CoinGecko daily snapshot for ` +
+        `"${id}" on ${settleDate} is strictly ${up ? "above" : "below"} ${threshold}. Resolves NO ` +
+        `otherwise. UNRESOLVED if the snapshot carries no USD price for that date.`,
       rationale:
         `${label} is at $${price.toLocaleString("en-US")} with a ${change.toFixed(2)}% move over 24h; ` +
-        `the threshold sits about one day's move ${up ? "above" : "below"} spot.`,
-      observed: { price, change_24h: change, threshold },
+        `the line sits about one day's move ${up ? "above" : "below"} spot.`,
+      observed: { spot: price, change_24h: change, threshold, settles_on: settleDate },
+      // Settling on a named day means the question is decided by that day, not by
+      // whoever calls resolve first.
+      min_close_seconds: CRYPTO_MIN_CLOSE,
+      // Yesterday's snapshot exists, which proves the endpoint answers for this
+      // coin; tomorrow's cannot exist yet, and never could in advance.
+      probe_url: evidenceUrl("crypto", `${id},${dmy(-1)}`),
     });
   }
   return out;

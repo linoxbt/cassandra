@@ -1262,9 +1262,16 @@ def _evidence_url(category: str, query: str) -> str:
     """Derived from fields fixed when the market opened, so nobody can choose the
     source after seeing which way the money went."""
     if category == CATEGORY_CRYPTO:
+        # `coin,DD-MM-YYYY`. The daily snapshot for a named date, never the spot
+        # price: `simple/price` answers with whatever the market is doing at the
+        # moment of the call, and `resolve` is callable by anyone at any moment
+        # inside the resolution window - so a holder could simply wait for a tick
+        # that suits them and settle on it. A date fixed when the market opened
+        # cannot be chosen after the fact.
+        coin, date = _crypto_parts(query)
         return (
-            "https://api.coingecko.com/api/v3/simple/price"
-            f"?ids={query}&vs_currencies=usd&include_24hr_change=true&include_last_updated_at=true"
+            f"https://api.coingecko.com/api/v3/coins/{coin}/history"
+            f"?date={date}&localization=false"
         )
     if category == CATEGORY_WEATHER:
         return f"https://api.open-meteo.com/v1/forecast?{query}&timezone=UTC"
@@ -1289,6 +1296,24 @@ def _evidence_url(category: str, query: str) -> str:
 
 _ARTICLE_OK = re.compile(r"^[A-Za-z0-9_.\-]+$")
 _DAY_OK = re.compile(r"^\d{8}$")
+_COIN_OK = re.compile(r"^[a-z0-9\-]+$")
+_DMY_OK = re.compile(r"^\d{2}-\d{2}-\d{4}$")
+
+
+def _crypto_parts(query: str) -> tuple:
+    parts = [p.strip() for p in str(query).split(",")]
+    if len(parts) != 2:
+        raise gl.vm.UserError(
+            f"{ERROR_EXPECTED} A crypto source_query is 'coin,DD-MM-YYYY'"
+        )
+    coin, date = parts
+    if not _COIN_OK.match(coin):
+        raise gl.vm.UserError(
+            f"{ERROR_EXPECTED} A coin id may only contain lowercase letters, digits and -"
+        )
+    if not _DMY_OK.match(date):
+        raise gl.vm.UserError(f"{ERROR_EXPECTED} A crypto date must be DD-MM-YYYY")
+    return coin, date
 
 
 def _pageview_parts(query: str) -> tuple:

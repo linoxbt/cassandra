@@ -21,7 +21,9 @@ export function SourceMarquee() {
             <span
               key={`${key}-${index}`}
               aria-hidden={index >= CATEGORY_KEYS.length}
-              className="flex items-center gap-3 font-mono text-[0.72rem] uppercase tracking-[0.2em] text-muted"
+              className={`flex items-center gap-3 font-mono text-[0.72rem] uppercase tracking-[0.2em] text-muted${
+                index >= CATEGORY_KEYS.length ? " motion-reduce:hidden" : ""
+              }`}
             >
               <span className="h-1 w-1 rounded-full" style={{ background: entry.accent }} />
               {entry.label}

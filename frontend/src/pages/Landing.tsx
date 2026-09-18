@@ -70,8 +70,8 @@ function Hero() {
   return (
     <section className="relative overflow-hidden border-b border-line">
       {/* The mark, oversized and turning slowly behind the type. */}
-      <div aria-hidden className="pointer-events-none absolute inset-0 flex items-center justify-end overflow-hidden">
-        <LogoMark className="h-[135%] w-auto translate-x-1/4 text-oxblood/[0.055] animate-slow-spin" />
+      <div aria-hidden className="pointer-events-none absolute inset-0 hidden items-center justify-end overflow-hidden md:flex">
+        <LogoMark className="mr-[-6%] h-[115%] w-auto text-oxblood/[0.04] animate-slow-spin" />
       </div>
 
       <div className="relative mx-auto grid max-w-6xl gap-12 px-4 py-20 md:grid-cols-[1.15fr_0.85fr] md:py-28">

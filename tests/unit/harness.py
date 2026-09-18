@@ -39,8 +39,8 @@ CONFIG = {
     "allow_public_markets": True,
 }
 
-COINGECKO_PREFIX = "https://api.coingecko.com/api/v3/simple/price"
-COINGECKO_BODY = json.dumps({"bitcoin": {"usd": 91250.42, "usd_24h_change": 2.1}}).encode()
+COINGECKO_PREFIX = "https://api.coingecko.com/api/v3/coins/"
+COINGECKO_BODY = json.dumps({"id": "bitcoin", "market_data": {"current_price": {"usd": 91250.42}}}).encode()
 
 VERDICT_YES = json.dumps({"outcome": "YES", "confidence": 93, "reasoning": "Above the threshold."})
 VERDICT_NO = json.dumps({"outcome": "NO", "confidence": 91, "reasoning": "Below the threshold."})
@@ -126,8 +126,8 @@ class Harness:
         args = {
             "question": "Will BTC trade above $90,000 on 2026-09-19?",
             "category": "crypto",
-            "source_query": "bitcoin",
-            "criteria": "Resolves YES if the CoinGecko USD price is strictly above 90000 at settlement.",
+            "source_query": "bitcoin,19-09-2026",
+            "criteria": "Resolves YES if the CoinGecko daily USD price for bitcoin on 2026-09-19 is above 90000.",
             "closes_at": self.now + closes_in,
             "rationale": "24h change is 2.1% and the threshold is within one move.",
         }
