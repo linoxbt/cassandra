@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+.venv/
+artifacts/
+node_modules/
+dist/
+.env
+.env.local
+gltest.config.yaml
+agent/state/*.keys.json
+agent/state/journal.log
+.DS_Store

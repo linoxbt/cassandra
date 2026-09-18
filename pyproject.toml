@@ -1,0 +1,18 @@
+[project]
+name = "cassandra-contracts"
+version = "0.1.0"
+description = "Agent-driven prediction markets, adjudicated inside GenLayer consensus"
+requires-python = ">=3.12,<3.13"
+dependencies = ["genlayer-py==0.16.3"]
+
+[dependency-groups]
+dev = [
+  "genlayer-test==0.29.2",
+  "genvm-linter==0.11.0",
+  "pytest>=8,<9",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests/direct", "tests/unit"]
+markers = ["integration: opt-in live GenLayer network tests"]
+addopts = "-m 'not integration'"

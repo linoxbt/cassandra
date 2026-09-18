@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install the GenVM linter and test SDK
+        run: |
+          python -m pip install --upgrade pip
+          pip install "genlayer-py==0.16.3" "genlayer-test==0.29.2" "genvm-linter==0.11.0" "pytest>=8,<9" pyright
+
+      - name: Lint and typecheck both contracts
+        run: |
+          genvm-lint check contracts/cassandra.py
+          genvm-lint check contracts/positions.py
+          genvm-lint typecheck contracts/cassandra.py
+          genvm-lint typecheck contracts/positions.py
+
+      # gltest's direct mode downloads `genvm-universal.tar.xz` from the latest
+      # GenVM release, but upstream renamed that asset to
+      # `genvm-runners-all.tar.xz` (byte-identical), so the download 404s on a
+      # fresh runner and every direct test fails at fixture setup. The loader
+      # prefers any cached version over "latest", so seeding the cache fixes it.
+      # Bump the version when GenVM's `latest` release moves.
+      - name: Seed the GenVM runner cache
+        run: |
+          mkdir -p ~/.cache/gltest-direct
+          curl -fsSL -o ~/.cache/gltest-direct/genvm-universal-v0.3.0-rc7.tar.xz \
+            https://github.com/genlayerlabs/genvm/releases/download/v0.3.0-rc7/genvm-runners-all.tar.xz
+
+      # Three invocations, not one: gltest's direct mode loads exactly one
+      # contract class per process, so the two contracts cannot share a run.
+      - name: Direct-mode suite (market)
+        run: python -m pytest tests/direct -q
+
+      - name: Direct-mode suite (positions)
+        run: python -m pytest tests/positions -q
+
+      - name: In-process suite (both contracts wired together)
+        run: python -m pytest tests/unit -q
+
+  agent:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: agent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm ci --no-audit --no-fund
+      - run: npm test
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build

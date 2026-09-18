@@ -1,0 +1,204 @@
+@import "@fontsource-variable/newsreader";
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/500.css";
+@import "tailwindcss";
+
+/* Cassandra reads as a printed broadsheet: ink on parchment, oxblood for the
+   authority of a ruling, gold leaf for the verdict itself. The app surface is
+   the same paper a shade cooler, so the marketing page and the application feel
+   like one publication rather than two products. */
+@theme {
+  --color-paper: #f3ece0;
+  --color-paper-2: #ece3d3;
+  --color-surface: #fbf7ef;
+  --color-ink: #14100e;
+  --color-ink-soft: #4a403a;
+  --color-muted: #7d7167;
+  --color-line: #d8cbb6;
+  --color-line-strong: #b9a88c;
+  --color-oxblood: #6b1f24;
+  --color-oxblood-soft: #8c3a3f;
+  --color-gold: #b08544;
+  --color-gold-soft: #d8b678;
+  --color-yes: #2f6b3f;
+  --color-no: #8c2f2f;
+  --color-pending: #8a6d2f;
+
+  --font-display: "Newsreader Variable", "Newsreader", Georgia, serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --radius-sm: 2px;
+
+  --text-display-sm: 2rem;
+  --text-display-sm--line-height: 1.08;
+  --text-display-sm--letter-spacing: -0.02em;
+  --text-display-md: 2.75rem;
+  --text-display-md--line-height: 1.04;
+  --text-display-md--letter-spacing: -0.025em;
+  --text-display-lg: 4rem;
+  --text-display-lg--line-height: 0.98;
+  --text-display-lg--letter-spacing: -0.03em;
+  --text-display-xl: 5.5rem;
+  --text-display-xl--line-height: 0.94;
+  --text-display-xl--letter-spacing: -0.035em;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    /* A faint laid-paper tooth. Two hairline gradients, no image request. */
+    background-image:
+      repeating-linear-gradient(
+        0deg,
+        rgba(20, 16, 14, 0.014) 0px,
+        rgba(20, 16, 14, 0.014) 1px,
+        transparent 1px,
+        transparent 3px
+      );
+  }
+
+  h1, h2, h3, h4 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    color: var(--color-ink);
+  }
+
+  ::selection {
+    background: var(--color-gold-soft);
+    color: var(--color-ink);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-oxblood);
+    outline-offset: 2px;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Motion. Every effect below is authored here rather than pulled from a physics
+   library: the whole landing page is CSS keyframes driven by an
+   IntersectionObserver, which is why it starts instantly and never janks.
+   --------------------------------------------------------------------------- */
+
+@keyframes cass-reveal {
+  from { opacity: 0; filter: blur(8px); transform: translateY(14px); }
+  to   { opacity: 1; filter: blur(0);   transform: translateY(0); }
+}
+
+@keyframes cass-mark-in {
+  from { opacity: 0; filter: blur(20px); transform: scale(0.72) rotate(-8deg); }
+  to   { opacity: 1; filter: blur(0);    transform: scale(1) rotate(0deg); }
+}
+
+@keyframes cass-rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes cass-draw {
+  from { stroke-dashoffset: var(--dash, 1000); }
+  to   { stroke-dashoffset: 0; }
+}
+
+@keyframes cass-slow-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@keyframes cass-marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+@keyframes cass-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.45; transform: scale(0.82); }
+}
+
+@keyframes cass-travel {
+  0%   { offset-distance: 0%; opacity: 0; }
+  12%  { opacity: 1; }
+  88%  { opacity: 1; }
+  100% { offset-distance: 100%; opacity: 0; }
+}
+
+@keyframes cass-sweep {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(200%); }
+}
+
+.animate-reveal      { animation: cass-reveal 900ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-mark-in     { animation: cass-mark-in 1100ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-rise        { animation: cass-rise 600ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-slow-spin   { animation: cass-slow-spin 140s linear infinite; }
+.animate-pulse-dot   { animation: cass-pulse 2.4s ease-in-out infinite; }
+.animate-sweep       { animation: cass-sweep 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+
+/* Rendered visible, then animated - never parked at opacity:0 waiting on an
+   observer, so the page still reads with JavaScript disabled or mid-screenshot. */
+.reveal-pending { opacity: 0; }
+.reveal-in      { animation: cass-reveal 900ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+.rule {
+  border: 0;
+  border-top: 1px solid var(--color-line);
+}
+
+.rule-strong {
+  border: 0;
+  border-top: 2px solid var(--color-ink);
+}
+
+/* A drop cap, because this is a broadsheet. */
+.dropcap::first-letter {
+  float: left;
+  font-family: var(--font-display);
+  font-size: 3.6em;
+  line-height: 0.82;
+  padding-right: 0.08em;
+  padding-top: 0.06em;
+  color: var(--color-oxblood);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+
+  /* Delays must be zeroed too, not just durations: a staggered reveal whose
+     delay survives leaves the content invisible for its full delay. */
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    transition-delay: 0ms !important;
+  }
+
+  .reveal-pending { opacity: 1 !important; }
+}
+
+/* The mark drawing itself, used by the splash and the verdict seal. */
+.leaf-half,
+.leaf-rib,
+.leaf-vein {
+  stroke-dasharray: var(--dash);
+  stroke-dashoffset: var(--dash);
+}
+
+.draw-on .leaf-rib  { animation: cass-draw 620ms cubic-bezier(0.4, 0, 0.2, 1) 0ms both; }
+.draw-on .leaf-half { animation: cass-draw 920ms cubic-bezier(0.4, 0, 0.2, 1) 420ms both; }
+.draw-on .leaf-vein { animation: cass-draw 420ms cubic-bezier(0.4, 0, 0.2, 1) 1100ms both; }

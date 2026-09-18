@@ -1,0 +1,32 @@
+# The Cassandra predictor agent.
+#
+# This unit is written but deliberately NOT enabled: it runs a process that
+# opens markets and spends GEN on its own schedule. Enable it only when you
+# actually want that:
+#
+#   cp deploy/cassandra-agent.service /etc/systemd/system/
+#   systemctl daemon-reload && systemctl enable --now cassandra-agent
+#
+# Everything it needs is in agent/.env (CASSANDRA_PW, GL_CHAIN, keystore names),
+# which is mode 600 and gitignored.
+[Unit]
+Description=Cassandra predictor agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/cassandra/agent
+ExecStart=/usr/local/bin/node daemon.mjs
+Restart=always
+RestartSec=30
+# Studio's rate limit is shared per IP, so one agent per host.
+Environment=TICK_SECONDS=900
+Environment=TICK_JITTER=90
+Environment=MAX_WRITES_PER_TICK=4
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=cassandra-agent
+
+[Install]
+WantedBy=multi-user.target

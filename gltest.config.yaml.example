@@ -1,0 +1,17 @@
+# Copy to gltest.config.yaml (gitignored) and fill in a funded key.
+networks:
+  default: localnet
+  localnet:
+    url: "http://127.0.0.1:4000/api"
+    leader_only: false
+  studionet:
+    accounts:
+      - "${CASSANDRA_DEPLOYER_KEY}"
+    from: ${CASSANDRA_DEPLOYER_KEY}
+  testnet_asimov:
+    accounts:
+      - "${CASSANDRA_DEPLOYER_KEY}"
+environment: .env
+paths:
+  contracts: "contracts"
+  artifacts: "artifacts"

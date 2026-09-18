@@ -1,0 +1,21 @@
+{
+  "name": "cassandra-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The Cassandra predictor agent and operator scripts",
+  "scripts": {
+    "setup": "node setup.mjs",
+    "deploy": "node deploy.mjs",
+    "tick": "node tick.mjs",
+    "daemon": "node daemon.mjs",
+    "propose": "node predictor.mjs",
+    "smoke": "node smoke.mjs",
+    "state": "node smoke.mjs state",
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "ethers": "^6.13.4",
+    "genlayer-js": "^1.1.8"
+  }
+}
