@@ -30,16 +30,38 @@ export function parseArgs(argv) {
   return args;
 }
 
-// Prefers variety over any one source dominating the board, then the proposal
-// whose threshold sits closest to a coin-flip.
+// Prefers variety over any one source dominating the board.
+//
+// Sorting by category load alone is not enough: within a single batch every
+// candidate sees the same counts, so the comparator falls through to a tiebreak
+// and the whole batch comes from whichever category wins it. CoinGecko alone
+// offers four coins, so a board opened that way is all crypto.
+//
+// Instead the candidates are bucketed by category and drawn round-robin, with
+// the categories that are already least represented on the board drawn first.
 export function rank(candidates, existingCategories = []) {
-  const seen = new Map();
-  for (const category of existingCategories) seen.set(category, (seen.get(category) ?? 0) + 1);
-  return [...candidates].sort((a, b) => {
-    const load = (seen.get(a.category) ?? 0) - (seen.get(b.category) ?? 0);
-    if (load !== 0) return load;
-    return a.category.localeCompare(b.category);
+  const load = new Map();
+  for (const category of existingCategories) load.set(category, (load.get(category) ?? 0) + 1);
+
+  const buckets = new Map();
+  for (const candidate of candidates) {
+    if (!buckets.has(candidate.category)) buckets.set(candidate.category, []);
+    buckets.get(candidate.category).push(candidate);
+  }
+
+  const order = [...buckets.keys()].sort((a, b) => {
+    const difference = (load.get(a) ?? 0) - (load.get(b) ?? 0);
+    return difference !== 0 ? difference : a.localeCompare(b);
   });
+
+  const ranked = [];
+  for (let round = 0; ranked.length < candidates.length; round += 1) {
+    for (const category of order) {
+      const bucket = buckets.get(category);
+      if (round < bucket.length) ranked.push(bucket[round]);
+    }
+  }
+  return ranked;
 }
 
 export async function openMarkets(options = {}) {
@@ -50,13 +72,20 @@ export async function openMarkets(options = {}) {
   console.log(`  ${candidates.length} candidates from live feeds`);
   if (candidates.length === 0) return [];
 
-  const { market } = deployment();
-  const agent = await keystoreAccount(process.env.AGENT_KS ?? "cassandra-agent");
-  const client = clientFor(agent);
-  const open = await read(client, market, "list_markets", [0, 50]);
-  const live = open.filter((m) => m.status === "OPEN");
+  // A dry run is for checking the agent before anything is deployed, so it never
+  // needs a deployment, a keystore or a chain read.
+  let market = null;
+  let client = null;
+  let live = [];
+  if (!args.dry) {
+    market = deployment().market;
+    const agent = await keystoreAccount(process.env.AGENT_KS ?? "cassandra-agent");
+    client = clientFor(agent);
+    const open = await read(client, market, "list_markets", [0, 50]);
+    live = open.filter((m) => m.status === "OPEN");
+    console.log(`  ${live.length} markets already open`);
+  }
   const existing = new Set(live.map((m) => `${m.category}:${m.source_query}`));
-  console.log(`  ${live.length} markets already open`);
 
   const ordered = rank(
     candidates.filter((c) => !existing.has(`${c.category}:${c.source_query}`)),

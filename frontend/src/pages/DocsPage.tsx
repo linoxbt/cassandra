@@ -259,14 +259,15 @@ return gl.vm.run_nondet_unsafe(leader_fn, validator_fn)`}</CodeBlock>
       <H2>How it settles</H2>
       <UL>
         <LI><Code>stake_juror(market_id, side)</Code> before the market closes. A juror cannot hedge both sides; topping up the same side adds to the bond.</LI>
-        <LI><Code>finalize_jury(market_id)</Code> once the market is settled: one bounded pass works out who was right and how much is being redistributed.</LI>
+        <LI><Code>finalize_jury(market_id)</Code> once the market is settled — callable by anyone, and it seals an unsealed verdict on the way, so no separate call is needed first. One bounded pass works out who was right and how much is being redistributed.</LI>
         <LI><Code>claim_jury(market_id)</Code> per juror, pulling their own settlement.</LI>
       </UL>
       <H2>Two rules that keep it honest</H2>
       <UL>
         <LI>
           Jurors are paid out of slashed bonds and forfeited dispute bonds, and <em>never</em> out of
-          the market pool. However badly a jury behaves it cannot reach the money the bettors put in —
+          the market pool. (A dispute bond forfeited on a market that drew no jury has no claimant,
+          so it goes to the fee ledger rather than into a pool nobody can withdraw from.) However badly a jury behaves it cannot reach the money the bettors put in —
           the contract enforces that with a separate ledger and a hard guard.
         </LI>
         <LI>
@@ -287,7 +288,12 @@ return gl.vm.run_nondet_unsafe(leader_fn, validator_fn)`}</CodeBlock>
       <H2>What a challenge costs</H2>
       <UL>
         <LI>Overturned — the bond is refunded in full and the outcome is rewritten.</LI>
-        <LI>Upheld — the bond is forfeited <em>to the jury pool</em>, paying the people who called it right rather than the contract owner.</LI>
+        <LI>
+          Upheld — the bond is forfeited. Where the market has a jury it goes to the jurors who
+          called it right, rather than to the contract owner. Where nobody bonded a reading there is
+          no claimant at all, so it goes to the protocol fee ledger instead of sitting in a pool with
+          no exit.
+        </LI>
         <LI>Never arbitrated — if the second round does not run before its own deadline, the market voids and the bond comes back. A dispute that was never tested cannot be judged frivolous.</LI>
       </UL>
       <H2>Arbitration sees both sides</H2>

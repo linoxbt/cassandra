@@ -77,7 +77,10 @@ export interface Juror {
 
 export interface Stats {
   markets: string;
-  open: string;
+  /** Markets that have not reached a terminal state. Deliberately NOT "still
+   *  trading": a market closes by the clock alone, so counting that on chain
+   *  would mean a full scan. Derive trading-now from `list_markets`. */
+  live: string;
   settled: string;
   agent_opened: string;
   volume: string;

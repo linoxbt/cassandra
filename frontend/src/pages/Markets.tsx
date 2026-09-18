@@ -23,6 +23,10 @@ export function Markets() {
   const { data: stats } = useStats();
   const [filter, setFilter] = useState<Filter>("all");
 
+  // `stats.live` counts markets that are not terminal yet, which includes ones
+  // whose clock has run out. "Trading now" is a client-side count off the rows.
+  const trading = useMemo(() => (markets ?? []).filter((m) => m.status === "OPEN").length, [markets]);
+
   const shown = useMemo(() => {
     if (!markets) return [];
     const match = FILTERS.find((f) => f.key === filter)!.match;
@@ -41,7 +45,7 @@ export function Markets() {
         <div className="flex items-center gap-4">
           {stats ? (
             <span className="font-mono text-[0.7rem] uppercase tracking-[0.14em] text-muted">
-              {stats.open} trading · {stats.settled} settled · {genLabel(stats.volume, 2)} staked
+              {trading} trading · {stats.settled} settled · {genLabel(stats.volume, 2)} staked
             </span>
           ) : null}
           <ButtonLink to="/create" tone="ghost">Open a market</ButtonLink>

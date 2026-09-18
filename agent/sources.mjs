@@ -225,10 +225,17 @@ async function newsCandidates(closesAt) {
 
 // Attention as a fact rather than an interpretation: one article, one daily
 // number, read off the same feed by the agent and by every validator.
+// A day's pageviews are only published the day after, so a market that closes
+// sooner than this can only ever read an empty feed. The close is pushed out
+// here rather than in `propose`, so the question quotes the time the market
+// actually closes instead of the one that was asked for.
+const PAGEVIEWS_MIN_CLOSE = 40 * 3600;
+
 async function pageviewsCandidates(closesAt) {
   // Pageviews lag by a day or so, so the baseline window ends yesterday.
   const end = isoCompact(-1);
   const start = isoCompact(-8);
+  const settles = Math.max(closesAt, Math.floor(Date.now() / 1000) + PAGEVIEWS_MIN_CLOSE);
   const out = [];
   for (const [article, label] of ARTICLES) {
     const query = `${article},${start},${end}`;
@@ -250,7 +257,7 @@ async function pageviewsCandidates(closesAt) {
     out.push({
       category: "pageviews",
       source_query: `${article},${isoCompact(0)},${isoCompact(1)}`,
-      question: `Will interest in ${label} spike past ${threshold.toLocaleString("en-US")} daily readers by ${stamp(closesAt)}?`,
+      question: `Will interest in ${label} spike past ${threshold.toLocaleString("en-US")} daily readers by ${stamp(settles)}?`,
       criteria:
         `Resolves YES if any daily "views" figure in the Wikimedia pageviews evidence feed for ` +
         `the article "${article}" is at least ${threshold}. Resolves NO if every day in the feed ` +
@@ -259,9 +266,11 @@ async function pageviewsCandidates(closesAt) {
         `Over the previous week "${article}" ran at a median of ${median.toLocaleString("en-US")} ` +
         `readers a day, peaking at ${peak.toLocaleString("en-US")}; the threshold is 15% above that peak.`,
       observed: { median, peak, threshold, baseline: `${start}-${end}` },
-      // A day's pageviews are only published the day after, so a market that
-      // closes sooner than this can only ever read an empty feed.
-      min_close_seconds: 40 * 3600,
+      // The window this market settles on has not happened yet, so the live
+      // check has to prove the endpoint answers for THIS ARTICLE rather than
+      // that the answer already exists - which for a prediction it never does.
+      probe_url: evidenceUrl("pageviews", query),
+      min_close_seconds: PAGEVIEWS_MIN_CLOSE,
     });
   }
   return out;
@@ -320,10 +329,12 @@ export async function propose(categories, closesAt) {
         if (!validQuery(candidate.source_query)) continue;
         if (candidate.question.length > 300 || candidate.criteria.length > 700) continue;
         const closes = Math.max(closesAt, Math.floor(Date.now() / 1000) + (candidate.min_close_seconds ?? 0));
+        const evidence_url = evidenceUrl(candidate.category, candidate.source_query);
         out.push({
           ...candidate,
           closes_at: closes,
-          evidence_url: evidenceUrl(candidate.category, candidate.source_query),
+          evidence_url,
+          probe_url: candidate.probe_url ?? evidence_url,
         });
       }
     } catch (err) {
@@ -333,12 +344,21 @@ export async function propose(categories, closesAt) {
   return out;
 }
 
-// A last check before any money is committed: the exact URL the contract will
-// fetch has to answer right now. A market the agent could not settle itself is a
-// market it has no business opening.
+// A last check before any money is committed: the source the contract will read
+// has to be answering right now. A market the agent could not settle is a market
+// it has no business opening.
+//
+// It probes `probe_url`, which for most categories is the settlement URL itself.
+// Where a market settles on a window that has not happened yet - a pageviews day
+// is only published the day after - the probe is the same endpoint over a window
+// that has. That proves the source works for this subject, which is the most
+// that can honestly be checked about a prediction in advance. Requiring the
+// settlement URL itself to answer would silently exclude every forward-looking
+// market, which is all of them.
 export async function settleable(candidate) {
   try {
-    const res = await fetch(candidate.evidence_url, { headers: { accept: "application/json", ...UA } });
+    const url = candidate.probe_url ?? candidate.evidence_url;
+    const res = await fetch(url, { headers: { accept: "application/json", ...UA } });
     if (!res.ok) return false;
     const text = await res.text();
     return text.length > 2;

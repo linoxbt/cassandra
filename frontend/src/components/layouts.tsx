@@ -1,8 +1,10 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { Suspense, lazy, useEffect, useState, type ReactNode } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { LogoMark, Wordmark } from "./logo-mark";
 import { NetworkSwitcher } from "./network-switcher";
-import { WalletButton } from "./wallet-button";
+// Lazy: this is the only thing in the shared chrome that reaches the wallet SDK,
+// and pulling it in statically would put ~1.4MB into the marketing bundle.
+const WalletButton = lazy(() => import("./wallet-button").then((m) => ({ default: m.WalletButton })));
 import { cn } from "./ui";
 import { NETWORKS, useNetwork } from "@/lib/network";
 
@@ -113,7 +115,9 @@ export function AppLayout() {
           </nav>
           <div className="flex shrink-0 items-center gap-3">
             <NetworkSwitcher className="hidden sm:inline-flex" />
-            <WalletButton />
+            <Suspense fallback={<span className="font-mono text-[0.64rem] uppercase tracking-[0.14em] text-muted">wallet…</span>}>
+              <WalletButton />
+            </Suspense>
           </div>
         </div>
       </header>
