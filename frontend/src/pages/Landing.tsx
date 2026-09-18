@@ -7,13 +7,13 @@ import { ScrollSequence } from "@/components/landing/scroll-sequence";
 import { OddsCurve } from "@/components/landing/odds-curve";
 import { VerdictSeal } from "@/components/landing/verdict-seal";
 import { EscrowFlow } from "@/components/landing/escrow-flow";
-import { AnimatedCounter } from "@/components/landing/animated-counter";
 import { useReveal } from "@/hooks/use-reveal";
-import { useStats } from "@/lib/queries";
+
+// The only part of the landing page that reads the chain. Split out so the hero
+// paints without waiting for the RPC client and everything underneath it.
+const Ledger = lazy(() => import("@/components/landing/ledger").then((m) => ({ default: m.Ledger })));
 import { CATEGORIES, CATEGORY_KEYS } from "@/lib/categories";
-import { gen } from "@/lib/format";
-import { isDeployed } from "@/lib/network";
-import { useEffect, useState } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 
 const LIFECYCLE = [
   {
@@ -54,7 +54,9 @@ export function Landing() {
       <SplashIntro />
       <Hero />
       <SourceMarquee />
-      <Ledger />
+      <Suspense fallback={<div className="h-[196px] border-b border-line" />}>
+        <Ledger />
+      </Suspense>
       <ScrollSequence id="how" panels={LIFECYCLE} />
       <Verdict />
       <Jury />
@@ -133,41 +135,6 @@ function Hero() {
             The curve is the market's only price: the share of the pool on each side.
           </p>
         </div>
-      </div>
-    </section>
-  );
-}
-
-function Ledger() {
-  const { data: stats } = useStats();
-  const reveal = useReveal();
-  const deployed = isDeployed();
-
-  const figures = [
-    { label: "Markets opened", value: Number(stats?.markets ?? 0), format: (n: number) => Math.round(n).toString() },
-    { label: "By the agent", value: Number(stats?.agent_opened ?? 0), format: (n: number) => Math.round(n).toString() },
-    { label: "Settled", value: Number(stats?.settled ?? 0), format: (n: number) => Math.round(n).toString() },
-    { label: "GEN staked", value: Number(gen(stats?.volume ?? "0", 2)), format: (n: number) => n.toFixed(2) },
-  ];
-
-  return (
-    <section ref={reveal.ref} className={`border-b border-line ${reveal.className}`}>
-      <div className="mx-auto max-w-6xl px-4 py-12">
-        <div className="grid grid-cols-2 gap-x-8 gap-y-8 md:grid-cols-4">
-          {figures.map((figure) => (
-            <div key={figure.label} className="border-t border-ink pt-3">
-              <Label>{figure.label}</Label>
-              <div className="mt-1.5 font-display text-display-sm leading-none text-ink tabular-nums">
-                {deployed ? <AnimatedCounter value={figure.value} format={figure.format} /> : "—"}
-              </div>
-            </div>
-          ))}
-        </div>
-        <p className="mt-6 font-mono text-[0.68rem] uppercase tracking-[0.16em] text-muted">
-          {deployed
-            ? "Read live from the contract on every page load"
-            : "Awaiting deployment — these figures come straight from the contract"}
-        </p>
       </div>
     </section>
   );

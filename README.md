@@ -25,7 +25,7 @@ says, and the escrow pays out against it automatically.
 | **Contracts** | [`contracts/cassandra.py`](contracts/cassandra.py) · [`contracts/positions.py`](contracts/positions.py) — GenVM / Python, no Solidity anywhere |
 | **Agent** | [`agent/`](agent/) — Node + `genlayer-js`; proposes markets, and nothing else |
 | **Frontend** | [`frontend/`](frontend/) — Vite + React + `genlayer-js`, talking to the chain directly |
-| **Tests** | 108 across three suites — see [Testing](#testing) |
+| **Tests** | 113 across three suites — see [Testing](#testing) |
 | **Architecture** | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) |
 
 ## How a market lives
@@ -91,7 +91,7 @@ python3 -m venv .venv
 ./.venv/bin/pip install "genlayer-py==0.16.3" "genlayer-test==0.29.2" "genvm-linter==0.11.0" "pytest>=8,<9" pyright
 
 make lint     # genvm-lint check + typecheck, both contracts
-make test     # 108 tests across three suites
+make test     # 113 tests across three suites
 ```
 
 ### Deploying
@@ -148,9 +148,9 @@ contract class per process.
 
 | Suite | What it proves |
 |---|---|
-| `tests/direct` (74) | the market against the real GenVM storage encoder: every guard, the consensus round, validator agreement *and* divergence |
+| `tests/direct` (76) | the market against the real GenVM storage encoder: every guard, the consensus round, validator agreement *and* divergence |
 | `tests/positions` (15) | mint/burn access control and idempotency, the transfer freeze |
-| `tests/unit` (19) | both contracts wired to each other, with a modelled balance — cross-contract settlement, double-claim attempts, and wei-level money conservation |
+| `tests/unit` (22) | both contracts wired to each other, with a modelled balance — cross-contract settlement, double-claim attempts, and wei-level money conservation, plus that the running counters never drift |
 
 The LLM path is built on `gl.vm.run_nondet_unsafe` rather than
 `gl.eq_principle.prompt_*` precisely so it is reachable under `mock_llm`: gltest

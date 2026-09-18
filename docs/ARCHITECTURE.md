@@ -39,7 +39,14 @@ and it is exactly the bug class worth avoiding — two ledgers that are supposed
 agree eventually do not. So there is only one. `bets` in `cassandra.py` is a
 replay journal for the mint message, never read at settlement.
 
-## The three rules that carry the safety argument
+## The rules that carry the safety argument
+
+**0. Every fetch identifies itself.** Wikimedia answers 403 to a request that
+does not name its caller, and it is not the only host that does. The User-Agent
+goes on every evidence request, including a challenger's citation — which is an
+arbitrary https URL the contract has no category for. Evidence that fails to load
+for a reason unrelated to the claim is the worst kind of failure here, because it
+decides a dispute on a technicality.
 
 **1. The evidence URL is derived, never supplied.** `_evidence_url(category,
 source_query)` builds the URL from fields fixed when the market opened. Nobody
@@ -92,10 +99,30 @@ never cross:
 `solvency()` returns all four, and the in-process suite asserts that everything
 paid out across a busy market equals everything paid in, less rounding dust.
 
+Both summary views (`solvency` and `stats`) read **running counters**, not a scan.
+A view that walks every market ever opened gets slower every day the agent runs,
+and these two are exactly what a dashboard polls. The counters are updated at the
+points money moves and at the single place a market reaches a terminal state, and
+a test drives a full lifecycle recomputing all five from scratch at every step —
+an incremental counter is only worth having if it cannot drift.
+
+One consequence worth knowing: `stats()` reports `live` (markets that have not
+reached FINAL or VOID), **not** markets still trading. A market closes by the
+clock alone, with no transaction to observe it, so counting what is still trading
+would need the scan back. The app derives that from the market list it already
+has.
+
 The jury is paid only from slashed bonds and forfeited dispute bonds. It can
 never take money from the people who bet. If nobody on the jury was right,
 nobody is slashed — with no counterparty to pay, slashing would only enrich the
 contract.
+
+A dispute bond forfeited on a market **nobody sat on as a juror** has no
+claimant: `claim_jury` is the only way out of the bonded pool and there is nobody
+who can call it. Rather than leave it stranded, `finalize_jury` moves it to the
+fee ledger, which does have a withdrawal path. So "an upheld dispute forfeits the
+bond to the jury" is true when there is a jury, and to the protocol when there
+is not.
 
 ## Three things this does not claim
 
@@ -125,9 +152,9 @@ contract class per process.
 
 | Suite | Host | Proves |
 |---|---|---|
-| `tests/direct` (74) | real GenVM SDK + storage encoder, one contract | the market's storage schema, every guard and transition, the consensus round against mocked web and LLM, validator agreement and divergence |
+| `tests/direct` (76) | real GenVM SDK + storage encoder, one contract | the market's storage schema, every guard and transition, the consensus round against mocked web and LLM, validator agreement and divergence |
 | `tests/positions` (15) | same, other contract | mint/burn access control and idempotency, the transfer freeze, metadata |
-| `tests/unit` (19) | in-process stub, **both contracts wired to each other** | cross-contract settlement, a transferred position paying its new holder, double-claim attempts, and wei-level money conservation against a modelled balance |
+| `tests/unit` (22) | in-process stub, **both contracts wired to each other** | cross-contract settlement, a transferred position paying its new holder, double-claim attempts, wei-level money conservation against a modelled balance, and that the running counters never drift |
 
 Two deliberate pieces of test infrastructure:
 
