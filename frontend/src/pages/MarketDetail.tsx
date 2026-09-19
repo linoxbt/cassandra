@@ -60,8 +60,8 @@ export function MarketDetail() {
         ) : null}
       </header>
 
-      <div className="mt-8 grid gap-10 lg:grid-cols-[1.35fr_0.65fr]">
-        <div>
+      <div className="mt-8 grid gap-10 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,0.65fr)]">
+        <div className="min-w-0">
           <Card className="p-6">
             <OddsCurve yes={odds.yes} />
             <div className="mt-6 grid grid-cols-3 gap-4 border-t border-line pt-4">
@@ -85,7 +85,7 @@ export function MarketDetail() {
           {verdict ? <AppealPanel marketId={market.id} /> : null}
         </div>
 
-        <aside className="flex flex-col gap-6">
+        <aside className="flex min-w-0 flex-col gap-6">
           <YourPosition market={market} held={held} position={position} />
           <ActionPanel market={market} verdict={verdict} held={held} position={position} />
           <Card className="p-5">
@@ -182,7 +182,7 @@ function EvidencePanel({ market }: { market: NonNullable<ReturnType<typeof useMa
           <div className="mt-5 border-t border-line pt-4">
             <Label>What the leader read</Label>
           </div>
-          <pre className="mt-2 max-h-56 overflow-auto rounded-sm border border-line bg-paper-2 p-3 text-[0.72rem] leading-relaxed text-ink-soft">
+          <pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap break-all rounded-sm border border-line bg-paper-2 p-3 text-[0.72rem] leading-relaxed text-ink-soft">
             {verdict.evidence_excerpt}
           </pre>
           <p className="mt-2 text-[0.78rem] text-muted">
