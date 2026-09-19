@@ -14,7 +14,7 @@ import { NETWORK, chain, keystoreAccount, loadEnv, fmtGen } from "./lib.mjs";
 
 loadEnv();
 
-if (NETWORK !== "studionet") {
+if (NETWORK !== "studionet" && NETWORK !== "studioNext") {
   console.log(`${NETWORK} has no RPC faucet - fund the deployer at https://testnet-faucet.genlayer.foundation`);
   process.exit(0);
 }

@@ -7,6 +7,26 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createAccount, createClient } from "genlayer-js";
 import { studionet, testnetAsimov } from "genlayer-js/chains";
+
+/**
+ * Studio Next, GenLayer's newer testnet: chain 61997, also reachable as
+ * studio-dev.genlayer.com (same network, two hostnames, like Asimov/Bradbury).
+ *
+ * genlayer-js does not ship a chain for it yet - 1.1.8 knows only localnet,
+ * studionet and the two Asimov/Bradbury gateways - so it is defined here by
+ * spreading studionet. That keeps `isStudio: true`, which is what routes
+ * transaction polling through the simulator RPC instead of the consensus
+ * contract, and keeps the consensus ABI; only the id, name and endpoint differ.
+ */
+const studioNext = {
+  ...studionet,
+  id: 61997,
+  name: "Genlayer Studio Next",
+  rpcUrls: { default: { http: ["https://studio-next.genlayer.com/api"] } },
+  blockExplorers: {
+    default: { name: "GenLayer Explorer", url: "https://studio-next.genlayer.com" },
+  },
+};
 import { CalldataAddress } from "genlayer-js/types";
 import { Wallet } from "ethers";
 import { backoffMs, classify, errorText, statusName } from "./txstatus.mjs";
@@ -17,7 +37,7 @@ export const STATE_DIR = path.join(HERE, "state");
 export const KEYSTORE_DIR = process.env.KEYSTORE_DIR ?? "/root/.genlayer/keystores";
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-export const CHAINS = { studionet, testnetAsimov };
+export const CHAINS = { studionet, studioNext, testnetAsimov };
 export const NETWORK = process.env.GL_CHAIN ?? "studionet";
 
 export function chain() {
