@@ -7,8 +7,8 @@
  */
 export const CONTRACTS = {
   studionet: {
-    market: "",
-    positions: "",
+    market: "0x13a8d47946411eCA180A611685713d73a831ac87",
+    positions: "0x28C872666ceE36636aebE65c2d62A38D08e34F29",
   },
   testnetAsimov: {
     market: "",

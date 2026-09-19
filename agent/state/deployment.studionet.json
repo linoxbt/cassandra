@@ -1,0 +1,34 @@
+{
+  "network": "studionet",
+  "market": "0x13a8d47946411eCA180A611685713d73a831ac87",
+  "positions": "0x28C872666ceE36636aebE65c2d62A38D08e34F29",
+  "agent": "0xf569F83D73481eb844E31916F53ec3F34aBF1515",
+  "deployer": "0xe271c0460179C5F791c870b17c9A05193145158f",
+  "market_tx": "0x2e49f8780ec0b598d34765e61735e00d6df97fa72e97ced10388e18d5d595e41",
+  "positions_tx": "0xf58a35c8a9cce4508ae2fcf4d2a5415f671ee7f15d1ed5e94bd41fa1d71c07af",
+  "deployed_at": "2026-09-19T06:02:47.809Z",
+  "config": {
+    "agent": "0xf569F83D73481eb844E31916F53ec3F34aBF1515",
+    "allow_public_markets": true,
+    "arbitration_window_seconds": "172800",
+    "categories": [
+      "crypto",
+      "news",
+      "weather",
+      "sports",
+      "pageviews"
+    ],
+    "dispute_bond_atto": "100000000000000000",
+    "dispute_window_seconds": "3600",
+    "juror_slash_bps": "5000",
+    "min_bet_atto": "1000000000000000",
+    "min_juror_bond_atto": "100000000000000000",
+    "min_seed_atto": "2000000000000000",
+    "owner": "0xe271c0460179C5F791c870b17c9A05193145158f",
+    "positions": "0x28C872666ceE36636aebE65c2d62A38D08e34F29",
+    "protocol_fee_bps": "0",
+    "resolve_window_seconds": "259200",
+    "trading_max_seconds": "2592000",
+    "trading_min_seconds": "300"
+  }
+}
