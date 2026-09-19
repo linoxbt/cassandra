@@ -72,6 +72,8 @@ class CassandraPositions(gl.Contract):
     balances: TreeMap[str, u256]
     supply: TreeMap[str, u256]
     holders: TreeMap[str, str]
+    holder_seen: TreeMap[str, bool]
+    holder_count: TreeMap[str, u256]
     ops: TreeMap[str, bool]
     meta: TreeMap[u256, Meta]
     known_ids: DynArray[u256]
@@ -111,18 +113,26 @@ class CassandraPositions(gl.Contract):
         self.balances[key] = u256(held - amount)
 
     def _remember_holder(self, id_key: str, holder: str) -> None:
-        current = str(self.holders.get(id_key, ""))
-        if not current:
-            self.holders[id_key] = holder
+        """Membership is a map lookup, not a scan of the joined list.
+
+        `mint` runs on every bet, and a market side can carry hundreds of
+        holders. Splitting a list that long and searching it each time would make
+        the cost of placing a bet grow with how popular the market already is -
+        and a repeat bettor would pay it for a name already on the list. The map
+        answers that in one lookup, and the string is only rewritten when a
+        genuinely new holder arrives."""
+        seen_key = f"{id_key}:{holder}"
+        if bool(self.holder_seen.get(seen_key, False)):
             return
-        parts = current.split(",")
-        if holder in parts:
-            return
-        if len(parts) >= MAX_HOLDERS_PER_SIDE:
+        count = int(self.holder_count.get(id_key, u256(0)))
+        if count >= MAX_HOLDERS_PER_SIDE:
             # The list is a convenience for the UI, not a settlement input:
-            # `balance_of` remains authoritative for everyone, listed or not.
+            # `balance_of` stays authoritative for everyone, listed or not.
             return
-        self.holders[id_key] = current + "," + holder
+        self.holder_seen[seen_key] = True
+        self.holder_count[id_key] = u256(count + 1)
+        current = str(self.holders.get(id_key, ""))
+        self.holders[id_key] = holder if not current else current + "," + holder
 
     def _seen(self, op_key: str) -> bool:
         key = _clean(op_key, MAX_OP_KEY_CHARS, "op_key")
@@ -265,6 +275,10 @@ class CassandraPositions(gl.Contract):
 
     @gl.public.view
     def holders_of(self, market_id: u256, side: str) -> list:
+        """Everyone who has ever held this position, capped at
+        MAX_HOLDERS_PER_SIDE. Holders are not removed when a balance reaches
+        zero, so read it as "who has touched this side", and take the balance
+        from `balance_of`."""
         raw = str(self.holders.get(_id_key(int(market_id), _side(side)), ""))
         return [h for h in raw.split(",") if h]
 
