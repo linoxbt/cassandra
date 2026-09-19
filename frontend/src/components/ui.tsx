@@ -131,3 +131,20 @@ export function Notice({ tone = "quiet", children }: { tone?: "quiet" | "warn"; 
     </div>
   );
 }
+
+/**
+ * A hairline grid paints its rules by showing the container's background through
+ * 1px gaps. An odd number of cells leaves one empty, and an empty cell shows the
+ * whole background as a solid block rather than a line. This fills it.
+ */
+export function GridFiller({ count, columns = 2 }: { count: number; columns?: number }) {
+  const empty = (columns - (count % columns)) % columns;
+  if (empty === 0) return null;
+  return (
+    <>
+      {Array.from({ length: empty }, (_, index) => (
+        <div key={`filler-${index}`} className="hidden bg-surface sm:block" aria-hidden />
+      ))}
+    </>
+  );
+}

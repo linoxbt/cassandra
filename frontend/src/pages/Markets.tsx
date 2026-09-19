@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ButtonLink, Empty, Label, Spinner, StatusBadge, cn } from "@/components/ui";
+import { ButtonLink, Empty, GridFiller, Label, Spinner, StatusBadge, cn } from "@/components/ui";
 import { OddsCurve } from "@/components/landing/odds-curve";
 import { useMarkets, useStats } from "@/lib/queries";
 import { genLabel, impliedOdds, timeUntil } from "@/lib/format";
@@ -87,6 +87,7 @@ export function Markets() {
         {shown.map((market) => (
           <MarketCard key={market.id} market={market} />
         ))}
+        <GridFiller count={shown.length} />
       </div>
     </>
   );

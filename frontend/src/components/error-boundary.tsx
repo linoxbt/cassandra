@@ -38,7 +38,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
           wrong. The most common cause is a contract read returning something unexpected, which
           usually means the wrong network is selected.
         </p>
-        <pre className="mt-4 overflow-x-auto rounded-sm border border-line bg-surface p-3 font-mono text-[0.72rem] text-muted">
+        <pre className="mt-4 max-w-full overflow-x-auto whitespace-pre-wrap break-all rounded-sm border border-line bg-surface p-3 font-mono text-[0.72rem] text-muted">
           {String(error?.message ?? error).slice(0, 400)}
         </pre>
         <div className="mt-5 flex gap-2">
