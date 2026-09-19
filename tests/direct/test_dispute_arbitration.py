@@ -147,3 +147,38 @@ def test_a_market_cannot_be_voided_early(contract, direct_vm, market):
     warp_to(direct_vm, AFTER_CLOSE)
     with direct_vm.expect_revert("cannot be voided yet"):
         contract.void_market(market)
+
+
+def test_a_dispute_cannot_point_the_validators_at_a_private_host(contract, direct_vm, market, direct_bob):
+    """A challenger names the URL and every validator fetches it, so this is the
+    one place an outsider chooses what the network reaches for. Cloud metadata
+    services and internal dashboards live on exactly these ranges."""
+    _resolve_yes(contract, direct_vm, market)
+    warp_to(direct_vm, IN_WINDOW)
+    direct_vm.sender = direct_bob
+    for hostile in (
+        "https://169.254.169.254/latest/meta-data/iam/security-credentials/",
+        "https://metadata.google.internal/computeMetadata/v1/",
+        "https://127.0.0.1:8080/admin",
+        "https://localhost/",
+        "https://10.0.0.5/internal",
+        "https://192.168.1.1/",
+        "https://172.17.0.1/docker",
+        "https://user:pass@evil.example/proof",
+    ):
+        direct_vm.value = GEN
+        with direct_vm.expect_revert():
+            contract.dispute(market, hostile, "Pointing somewhere it should not go.")
+    direct_vm.value = 0
+
+
+def test_a_public_host_outside_the_private_ranges_is_still_allowed(contract, direct_vm, market, direct_bob):
+    # 172.32 is public; only 172.16-172.31 is RFC1918, and a blanket "172." rule
+    # would quietly block a legitimate citation.
+    _resolve_yes(contract, direct_vm, market)
+    warp_to(direct_vm, IN_WINDOW)
+    direct_vm.sender = direct_bob
+    direct_vm.value = GEN
+    contract.dispute(market, "https://172.32.4.5/report", "A public address.")
+    direct_vm.value = 0
+    assert contract.get_dispute(market)["evidence_url"] == "https://172.32.4.5/report"
