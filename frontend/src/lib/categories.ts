@@ -9,7 +9,7 @@ export const CATEGORIES: Record<Category, { label: string; source: string; blurb
   crypto: {
     label: "Crypto",
     source: "CoinGecko",
-    blurb: "A spot price, read at settlement and compared against a threshold fixed when the market opened.",
+    blurb: "A recorded daily price for a named date, compared against a threshold fixed when the market opened.",
     accent: "#b08544",
   },
   weather: {

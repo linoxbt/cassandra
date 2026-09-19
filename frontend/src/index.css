@@ -76,6 +76,12 @@
     color: var(--color-ink);
   }
 
+  /* JetBrains Mono ligates != into a single glyph, which is charming in an editor
+     and misleading in a documentation sample someone is reading as source. */
+  code, pre, kbd {
+    font-variant-ligatures: none;
+  }
+
   ::selection {
     background: var(--color-gold-soft);
     color: var(--color-ink);

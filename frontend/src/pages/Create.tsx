@@ -16,7 +16,7 @@ import { cn } from "@/components/ui";
 const QUERY_OK = /^[A-Za-z0-9_\-.,=&+ ]+$/;
 
 const PLACEHOLDER: Record<Category, { query: string; hint: string }> = {
-  crypto: { query: "bitcoin", hint: "A CoinGecko coin id." },
+  crypto: { query: "bitcoin,19-09-2026", hint: "A CoinGecko coin id and a settlement date, DD-MM-YYYY." },
   weather: {
     query: "latitude=51.51&longitude=-0.13&daily=temperature_2m_max&start_date=2026-09-20&end_date=2026-09-20",
     hint: "An Open-Meteo query string. No slashes.",
@@ -50,6 +50,8 @@ export function CreateMarket() {
     if (criteria.trim().length < 20) list.push("Say exactly what makes this resolve YES.");
     if (criteria.length > 700) list.push("The criteria are over 700 characters.");
     if (!QUERY_OK.test(query)) list.push("The source query may only contain letters, digits and _-.,=&+");
+    // Everything past the character set is the contract's own check; it reverts
+    // with a readable message, which the app surfaces rather than re-implements.
     if (seedAtto <= 0n) list.push("The seed must be more than nothing.");
     if (seedAtto % 2n !== 0n) list.push("The seed must be an even number of wei so both sides start level.");
     if (Number(hours) < 0.1) list.push("The market must stay open at least a few minutes.");
@@ -116,7 +118,7 @@ export function CreateMarket() {
             <input
               value={question}
               onChange={(event) => setQuestion(event.target.value)}
-              placeholder="Will Bitcoin trade above $90,000 by Friday?"
+              placeholder="Will Bitcoin's daily price on 19-09-2026 be above $90,000?"
               className="mt-1 w-full rounded-sm border border-line bg-surface px-3 py-2 text-[0.95rem] text-ink outline-none focus:border-line-strong"
             />
           </label>
@@ -128,7 +130,7 @@ export function CreateMarket() {
               value={criteria}
               onChange={(event) => setCriteria(event.target.value)}
               rows={4}
-              placeholder="Resolves YES if the CoinGecko USD price for bitcoin is strictly above 90000 at settlement. Resolves NO otherwise. UNRESOLVED if the feed carries no usable price."
+              placeholder="Resolves YES if CoinGecko's recorded daily price for bitcoin on 19-09-2026 is strictly above 90000. Resolves NO otherwise. UNRESOLVED if the feed carries no price for that date."
               className="mt-1 w-full rounded-sm border border-line bg-surface px-3 py-2 text-[0.9rem] leading-relaxed text-ink outline-none focus:border-line-strong"
             />
           </label>

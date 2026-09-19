@@ -338,6 +338,20 @@ return gl.vm.run_nondet_unsafe(leader_fn, validator_fn)`}</CodeBlock>
         the check runs when the market opens rather than when it settles — so a bad market is refused
         before anyone can stake on it.
       </P>
+      <H2>Settlement is pinned to a date, not to a moment</H2>
+      <P>
+        Every market names the day it settles on when it opens, and the evidence URL asks the feed
+        for that day. <Code>resolve</Code> is open to anyone for the whole resolution window, so a
+        market that read a live spot price would let whoever called it pick a tick that suited them.
+        Asking for a recorded daily figure removes the choice entirely: the answer is the same
+        whenever the call is made.
+      </P>
+      <P>
+        World news is the stated exception. "Is this still being reported" is inherently relative to
+        when you ask, and it is a judgement rather than a number — which is precisely why it is the
+        category where consensus over a reading earns its place.
+      </P>
+
       <H3>Evidence is untrusted data</H3>
       <P>
         Whatever the feed returns is wrapped in an explicit fence and labelled as data that is never
