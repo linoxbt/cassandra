@@ -1,0 +1,46 @@
+# Netlify build for the Cassandra frontend.
+#
+# `base` is where the build runs; `publish` is resolved from the REPOSITORY
+# ROOT, not from `base` - a bare "dist" sends Netlify looking in /dist for a
+# build that landed in /frontend/dist, and the deploy fails with nothing to
+# publish.
+[build]
+  base = "frontend"
+  command = "npm run build"
+  publish = "frontend/dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+  NPM_FLAGS = "--no-audit --no-fund"
+  # Deliberately NOT setting NODE_ENV=production: Netlify honours it at install
+  # time and drops devDependencies, where vite, typescript and tailwind live, so
+  # the build dies with "vite: not found".
+
+# A single-page app: every route is served by the same document.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "geolocation=(), camera=(), microphone=(), payment=()"
+    # Four directives only, and deliberately nothing about script-src or
+    # connect-src. A wallet modal needs to reach the WalletConnect relay over
+    # websockets and the GenLayer RPC over fetch, and it renders through an
+    # iframe; tightening either directive without a real connect test is how a
+    # site ships looking fine and silently unable to connect a wallet.
+    Content-Security-Policy = "frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"

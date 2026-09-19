@@ -11,3 +11,6 @@ agent/state/*.keys.json
 agent/state/journal.log
 .DS_Store
 agent/state/deploy-progress.*.json
+
+# Local Netlify folder
+.netlify
