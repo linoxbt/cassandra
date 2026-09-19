@@ -156,6 +156,9 @@ export const getBalance = (id: string | number, side: Side, holder: string) =>
 export interface WriteContext {
   account: `0x${string}`;
   provider: EIP1193Provider;
+  /** Called once the wallet has signed and the hash exists, so the UI can stop
+   *  saying "signing" while it waits for consensus. */
+  onSubmitted?: (hash: string) => void;
 }
 
 async function send(
@@ -167,6 +170,7 @@ async function send(
 ): Promise<{ hash: string; outcome: TxOutcome }> {
   const client = createWriteClient(ctx.account, ctx.provider);
   const hash = (await client.writeContract({ address, functionName, args, value })) as string;
+  ctx.onSubmitted?.(hash);
   const outcome = await waitForTx(hash);
   return { hash, outcome };
 }

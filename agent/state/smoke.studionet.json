@@ -7,5 +7,6 @@
   "open_tx": "0xa0d59db066e78b6772b2d7c496a5c3eba3b41aecdf5661e2ab7cdcb0d64ca379",
   "bet": true,
   "transferred": true,
-  "resolved": true
+  "resolved": true,
+  "claimed": true
 }

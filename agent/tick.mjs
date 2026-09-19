@@ -132,7 +132,7 @@ export async function tick(options = {}) {
   const stats = await read(client, market, "stats");
   const solvency = await read(client, market, "solvency");
   console.log(
-    `  board: ${stats.markets} markets, ${stats.open} open, ${stats.settled} settled, ` +
+    `  board: ${stats.markets} markets, ${stats.live} live, ${stats.settled} settled, ` +
       `${fmtGen(stats.volume)} staked, ${fmtGen(solvency.market_escrow)} in escrow`,
   );
   return done;

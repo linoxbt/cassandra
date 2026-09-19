@@ -122,7 +122,7 @@ export function Jury() {
                 <div className="mt-4 flex flex-wrap gap-2">
                   <Button
                     tone="ghost"
-                    disabled={!action.connected}
+                    disabled={!action.connected || action.state === "signing" || action.state === "waiting"}
                     onClick={() =>
                       action.run((ctx) => finalizeJury(ctx, market.id), {
                         note: "One bounded pass to work out who was right. Anyone can call this.",
@@ -134,7 +134,7 @@ export function Jury() {
                   {mine && !mine.settled ? (
                     <Button
                       tone="primary"
-                      disabled={!action.connected}
+                      disabled={!action.connected || action.state === "signing" || action.state === "waiting"}
                       onClick={() => action.run((ctx) => claimJury(ctx, market.id), { note: "Pulling your own settlement." })}
                     >
                       Claim your settlement

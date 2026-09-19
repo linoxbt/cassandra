@@ -21,6 +21,17 @@ for (const signal of ["SIGINT", "SIGTERM"]) {
   });
 }
 
+// Only when run directly. Importing this file used to start the loop, which
+// means anything that so much as inspected the module began opening markets and
+// spending GEN.
+const isMain = process.argv[1] && import.meta.url.endsWith(process.argv[1].split("/").pop());
+if (!isMain) {
+  console.log("daemon.mjs imported rather than run; not starting the loop.");
+} else {
+await main();
+}
+
+async function main() {
 console.log(`cassandra agent: every ~${Math.round(INTERVAL_MS / 60000)} minutes`);
 while (running) {
   const started = Date.now();
@@ -35,3 +46,4 @@ while (running) {
   await sleep(wait);
 }
 console.log("stopped");
+}

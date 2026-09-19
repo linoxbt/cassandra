@@ -15,6 +15,25 @@ import { cn } from "@/components/ui";
  *  cannot be submitted from here in the first place. */
 const QUERY_OK = /^[A-Za-z0-9_\-.,=&+ ]+$/;
 
+/**
+ * When the data a market settles on becomes available, in ms, or null where the
+ * source is continuous and the question is about "now".
+ */
+function settlementDayEndMs(category: string, query: string): number | null {
+  const parts = query.split(",").map((part) => part.trim());
+  if (category === "crypto" && parts.length === 2) {
+    const [day, month, year] = parts[1].split("-").map(Number);
+    if (!day || !month || !year) return null;
+    return Date.UTC(year, month - 1, day + 1);
+  }
+  if (category === "pageviews" && parts.length === 3) {
+    const end = parts[2];
+    if (!/^\d{8}$/.test(end)) return null;
+    return Date.UTC(Number(end.slice(0, 4)), Number(end.slice(4, 6)) - 1, Number(end.slice(6)) + 1);
+  }
+  return null;
+}
+
 const PLACEHOLDER: Record<Category, { query: string; hint: string }> = {
   crypto: { query: "bitcoin,19-09-2026", hint: "A CoinGecko coin id and a settlement date, DD-MM-YYYY." },
   weather: {
@@ -55,8 +74,21 @@ export function CreateMarket() {
     if (seedAtto <= 0n) list.push("The seed must be more than nothing.");
     if (seedAtto % 2n !== 0n) list.push("The seed must be an even number of wei so both sides start level.");
     if (Number(hours) < 0.1) list.push("The market must stay open at least a few minutes.");
+
+    // Crypto and pageviews settle on a named day, and that day's figures are
+    // only published after it ends. A market that closes first can only ever
+    // read a 404, so it would close, fail to resolve, and void at its deadline -
+    // safe, but dead on arrival, and nothing in the flow would have said so.
+    const closesAtMs = Date.now() + Number(hours || 0) * 3_600_000;
+    const settlesAtMs = settlementDayEndMs(category, query);
+    if (settlesAtMs !== null && closesAtMs < settlesAtMs) {
+      list.push(
+        `This settles on data for ${new Date(settlesAtMs).toISOString().slice(0, 10)}, which is not ` +
+          `published until that day ends. Keep the market open until then or it can never resolve.`,
+      );
+    }
     return list;
-  }, [question, criteria, query, seedAtto, hours]);
+  }, [question, criteria, query, seedAtto, hours, category]);
 
   if (!isDeployed()) return <NotDeployed />;
 

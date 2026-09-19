@@ -11,8 +11,11 @@ import { NotDeployed } from "./Markets";
 
 /**
  * A portfolio is the position ledger, filtered to you. There is no index of
- * "markets this address touched", so the app reads a balance per market - which
- * is honest about where the data comes from and cheap enough at this size.
+ * "markets this address touched", so a balance has to be read per market.
+ *
+ * That is one request each, against an RPC with a shared daily budget, so the
+ * reads are cached for five minutes and a write invalidates them - which is the
+ * only moment a balance can actually have changed.
  */
 export function Portfolio() {
   const network = useNetwork();
@@ -24,7 +27,8 @@ export function Portfolio() {
       queryKey: ["portfolio", network, market.id, address],
       queryFn: () => getPosition(market.id, address!),
       enabled: Boolean(address) && isDeployed(),
-      staleTime: 20_000,
+      staleTime: 5 * 60_000,
+      gcTime: 30 * 60_000,
     })),
   });
 

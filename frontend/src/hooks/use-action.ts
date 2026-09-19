@@ -36,13 +36,25 @@ export function useAction() {
     setNote(options.note ?? null);
     setState("signing");
     try {
-      const promise = action({ account: address, provider });
-      setState("waiting");
-      const { hash: txHash, outcome } = await promise;
+      // `signing` has to survive until the wallet actually hands something back,
+      // otherwise the UI reads "waiting" while the signature prompt is still up
+      // and the label describes the wrong thing entirely.
+      const { hash: txHash, outcome } = await action({
+        account: address,
+        provider,
+        onSubmitted: () => setState("waiting"),
+      });
       setHash(txHash);
       if (outcome.state === "confirmed") {
         setState("done");
-        await queryClient.invalidateQueries();
+        // Only what a write can have changed. Invalidating everything sends a
+        // burst of reads at an RPC whose daily budget this app already lives
+        // inside, and the marketing figures do not need to be re-read.
+        await Promise.all(
+          ["markets", "market", "verdict", "dispute", "jury", "position", "portfolio", "stats", "solvency"].map(
+            (key) => queryClient.invalidateQueries({ queryKey: [key] }),
+          ),
+        );
         return outcome;
       }
       setState("failed");

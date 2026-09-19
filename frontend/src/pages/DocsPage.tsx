@@ -304,11 +304,24 @@ return gl.vm.run_nondet_unsafe(leader_fn, validator_fn)`}</CodeBlock>
       </P>
       <H2>Appeals</H2>
       <P>
-        Separately from all of this, GenLayer itself supports appealing a transaction, which forces a
-        fresh consensus round under real validator economics rather than application-level bonds. Where
-        the network supports it, the app surfaces it on a settled market. Where it does not, the
-        control is hidden rather than shown as a button that does nothing.
+        An appeal is a different thing from the challenge above, and it is worth keeping the two
+        apart. A challenge is application-level: a bond this contract holds, and a second consensus
+        round the contract runs itself. An appeal is protocol-level — it asks GenLayer to run the
+        settlement transaction again under real validator economics, and the contract has no part
+        in it.
       </P>
+      <P>
+        Not every network can do it, so the app asks rather than assumes. Every settled market shows
+        an Appeal panel that reports what it found: the bond and a control where the network can
+        price one, and a plain statement of why not where it cannot. Studio Network cannot —
+        it simulates consensus instead of running the staking contracts, so there is no bond to
+        calculate. Showing a button there that could only fail would be worse than saying so.
+      </P>
+      <Note>
+        A settlement can only be appealed after it is decided and before it finalizes, and only
+        once. Past that the panel says there is nothing to appeal, which is usually what it will
+        say.
+      </Note>
     </>
   ),
 

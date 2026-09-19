@@ -1,6 +1,7 @@
 import { lazy, Suspense } from "react";
 import { Route, Routes } from "react-router-dom";
 import { WalletProviders } from "./components/wallet-providers";
+import { ErrorBoundary } from "./components/error-boundary";
 import { AppLayout, MarketingLayout } from "./components/layouts";
 import { Landing } from "./pages/Landing";
 import { DocsLayout } from "./pages/Docs";
@@ -16,31 +17,33 @@ const CreateMarket = lazy(() => import("./pages/Create").then((m) => ({ default:
 
 export function App() {
   return (
-    <Routes>
-      <Route element={<MarketingLayout />}>
-        <Route path="/" element={<Landing />} />
-        <Route path="/docs" element={<DocsLayout />}>
-          <Route index element={<DocsIndex />} />
-          <Route path=":slug" element={<DocsPage />} />
+    <ErrorBoundary>
+      <Routes>
+        <Route element={<MarketingLayout />}>
+          <Route path="/" element={<Landing />} />
+          <Route path="/docs" element={<DocsLayout />}>
+            <Route index element={<DocsIndex />} />
+            <Route path=":slug" element={<DocsPage />} />
+          </Route>
         </Route>
-      </Route>
-      <Route
-        element={
-          <WalletProviders>
-            <Suspense fallback={null}>
-              <AppLayout />
-            </Suspense>
-          </WalletProviders>
-        }
-      >
-        <Route path="/markets" element={<Markets />} />
-        <Route path="/market/:id" element={<MarketDetail />} />
-        <Route path="/portfolio" element={<Portfolio />} />
-        <Route path="/jury" element={<Jury />} />
-        <Route path="/agent" element={<AgentPage />} />
-        <Route path="/create" element={<CreateMarket />} />
-      </Route>
-      <Route path="*" element={<NotFound />} />
-    </Routes>
+        <Route
+          element={
+            <WalletProviders>
+              <Suspense fallback={null}>
+                <AppLayout />
+              </Suspense>
+            </WalletProviders>
+          }
+        >
+          <Route path="/markets" element={<Markets />} />
+          <Route path="/market/:id" element={<MarketDetail />} />
+          <Route path="/portfolio" element={<Portfolio />} />
+          <Route path="/jury" element={<Jury />} />
+          <Route path="/agent" element={<AgentPage />} />
+          <Route path="/create" element={<CreateMarket />} />
+        </Route>
+          <Route path="*" element={<NotFound />} />
+      </Routes>
+    </ErrorBoundary>
   );
 }

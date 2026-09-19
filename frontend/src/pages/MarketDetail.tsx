@@ -6,9 +6,12 @@ import { VerdictSeal } from "@/components/landing/verdict-seal";
 import { EscrowFlow, type FlowState } from "@/components/landing/escrow-flow";
 import { TxStatus } from "@/components/tx-status";
 import { useAction } from "@/hooks/use-action";
-import { useDispute, useJury, useMarket, usePosition, useVerdict } from "@/lib/queries";
+import { useConfig, useDispute, useJury, useMarket, usePosition, useVerdict } from "@/lib/queries";
+import { useAppealSupport, useAppealTarget } from "@/hooks/use-appeal";
+import { submitAppeal } from "@/lib/appeal";
 import {
-  arbitrateMarket, claimPayout, fileDispute, placeBet, resolveMarket, stakeJuror, voidMarket,
+  arbitrateMarket, claimPayout, fileDispute, placeBet, resolveMarket, stakeJuror,
+  transferPosition, voidMarket,
 } from "@/lib/contract";
 import type { Side } from "@/lib/contract";
 import { gen, genLabel, impliedOdds, shortAddress, stamp, timeUntil, toAtto } from "@/lib/format";
@@ -79,11 +82,12 @@ export function MarketDetail() {
           {dispute ? <DisputePanel dispute={dispute} /> : null}
           <EvidencePanel market={market} />
           {jury && jury.length > 0 ? <JuryPanel jury={jury} /> : null}
+          {verdict ? <AppealPanel marketId={market.id} /> : null}
         </div>
 
         <aside className="flex flex-col gap-6">
           <YourPosition market={market} held={held} position={position} />
-          <ActionPanel market={market} verdict={verdict} held={held} />
+          <ActionPanel market={market} verdict={verdict} held={held} position={position} />
           <Card className="p-5">
             <Label>Contract</Label>
             <a
@@ -276,11 +280,182 @@ function YourPosition({
         </div>
       )}
       {market.status === "OPEN" && held > 0n ? (
-        <p className="mt-3 text-[0.8rem] leading-relaxed text-muted">
-          These are tokens. You can sell them to someone else while the market is still trading —
+        <TransferPosition market={market} position={position} />
+      ) : null}
+    </Card>
+  );
+}
+
+/**
+ * The transfer the app has always described and never offered: a position is a
+ * token, and while the market trades it can go to anyone. After the close the
+ * ledger freezes, which is what makes settling against it safe.
+ */
+function TransferPosition({
+  market,
+  position,
+}: {
+  market: NonNullable<ReturnType<typeof useMarket>["data"]>;
+  position: ReturnType<typeof usePosition>["data"];
+}) {
+  const action = useAction();
+  const [open, setOpen] = useState(false);
+  const [to, setTo] = useState("");
+  const [amount, setAmount] = useState("");
+  const [side, setSide] = useState<Side>("YES");
+
+  const available = BigInt(side === "YES" ? position?.yes ?? "0" : position?.no ?? "0");
+  const value = useMemo(() => {
+    try {
+      return toAtto(amount);
+    } catch {
+      return 0n;
+    }
+  }, [amount]);
+
+  const validAddress = /^0x[0-9a-fA-F]{40}$/.test(to.trim());
+  const busy = action.state === "signing" || action.state === "waiting";
+  const problem =
+    !validAddress && to.length > 0
+      ? "That is not an address."
+      : value > available
+        ? `You only hold ${gen(available.toString(), 3)} on ${side}.`
+        : null;
+
+  if (!open) {
+    return (
+      <div className="mt-3">
+        <p className="text-[0.8rem] leading-relaxed text-muted">
+          These are tokens. You can hand them to someone else while the market is still trading —
           after that they freeze, so whoever holds them at settlement is who gets paid.
         </p>
-      ) : null}
+        <Button tone="ghost" className="mt-3 w-full" onClick={() => setOpen(true)}>
+          Transfer a position
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-4 border-t border-line pt-4">
+      <Label>Transfer</Label>
+      <div className="mt-2 flex gap-1">
+        {(["YES", "NO"] as Side[]).map((option) => (
+          <button
+            key={option}
+            type="button"
+            onClick={() => setSide(option)}
+            disabled={BigInt(option === "YES" ? position?.yes ?? "0" : position?.no ?? "0") === 0n}
+            className={cn(
+              "flex-1 rounded-sm border px-2 py-1.5 font-mono text-[0.68rem] uppercase tracking-[0.12em] transition-colors disabled:opacity-40",
+              side === option ? "border-ink bg-ink text-paper" : "border-line text-muted hover:text-ink",
+            )}
+          >
+            {option} {gen(option === "YES" ? position?.yes ?? "0" : position?.no ?? "0", 2)}
+          </button>
+        ))}
+      </div>
+      <input
+        value={to}
+        onChange={(event) => setTo(event.target.value)}
+        placeholder="0x… recipient"
+        spellCheck={false}
+        className="mt-2 w-full rounded-sm border border-line bg-surface px-3 py-2 font-mono text-[0.78rem] text-ink outline-none focus:border-line-strong"
+      />
+      <div className="mt-2 flex gap-2">
+        <input
+          value={amount}
+          onChange={(event) => setAmount(event.target.value)}
+          inputMode="decimal"
+          placeholder="Amount"
+          className="min-w-0 flex-1 rounded-sm border border-line bg-surface px-3 py-2 font-mono text-[0.85rem] text-ink outline-none focus:border-line-strong"
+        />
+        <button
+          type="button"
+          onClick={() => setAmount(gen(available.toString(), 18))}
+          className="rounded-sm border border-line px-3 font-mono text-[0.66rem] uppercase tracking-[0.12em] text-muted hover:text-ink"
+        >
+          All
+        </button>
+      </div>
+      {problem ? <p className="mt-2 text-[0.78rem] text-no">{problem}</p> : null}
+      <div className="mt-3 flex gap-2">
+        <Button
+          tone="primary"
+          className="flex-1"
+          disabled={!action.connected || busy || !validAddress || value <= 0n || value > available}
+          onClick={() =>
+            action.run((ctx) => transferPosition(ctx, market.id, side, to.trim(), value), {
+              note: "Moving a position token. The escrow pays whoever holds it at settlement.",
+            })
+          }
+        >
+          Send {side}
+        </Button>
+        <Button tone="ghost" onClick={() => setOpen(false)} disabled={busy}>
+          Cancel
+        </Button>
+      </div>
+      <TxStatus state={action.state} error={action.error} hash={action.hash} note={action.note} />
+    </div>
+  );
+}
+
+/**
+ * A protocol-level appeal, which is not this app's dispute: it re-runs the
+ * settlement under real validator economics. Rendered only where the network can
+ * actually price an appeal bond - on a chain that cannot, saying so is more use
+ * than a button that fails.
+ */
+function AppealPanel({ marketId }: { marketId: string }) {
+  const action = useAction();
+  const { data: support } = useAppealSupport();
+  const { data: target, isLoading } = useAppealTarget(marketId, support?.supported === true);
+
+  if (!support) return null;
+
+  if (!support.supported) {
+    return (
+      <Card className="mt-6 p-5">
+        <Label>Appeal</Label>
+        <p className="mt-2 text-[0.84rem] leading-relaxed text-muted">
+          GenLayer can re-run a settlement under real validator economics, separately from the
+          bonded challenge above. Not here, though: {support.reason}
+        </p>
+      </Card>
+    );
+  }
+
+  if (isLoading) return null;
+  if (!target) {
+    return (
+      <Card className="mt-6 p-5">
+        <Label>Appeal</Label>
+        <p className="mt-2 text-[0.84rem] leading-relaxed text-muted">
+          Nothing to appeal. A settlement can only be appealed after it is decided and before it
+          finalizes, and only once.
+        </p>
+      </Card>
+    );
+  }
+
+  const busy = action.state === "signing" || action.state === "waiting";
+  return (
+    <Card className="mt-6 p-5">
+      <Label>Appeal</Label>
+      <p className="mt-2 text-[0.84rem] leading-relaxed text-muted">
+        This forces the network to run the {target.method} again under real validator economics —
+        not the contract's own second round. The bond is {genLabel(target.minBond.toString(), 4)}.
+      </p>
+      <Button
+        tone="ghost"
+        className="mt-3 w-full"
+        disabled={!action.connected || busy}
+        onClick={() => action.run((ctx) => submitAppeal(ctx, target), { note: "Appealing to the network." })}
+      >
+        Appeal this settlement
+      </Button>
+      <TxStatus state={action.state} error={action.error} hash={action.hash} note={action.note} />
     </Card>
   );
 }
@@ -289,12 +464,17 @@ function ActionPanel({
   market,
   verdict,
   held,
+  position,
 }: {
   market: NonNullable<ReturnType<typeof useMarket>["data"]>;
   verdict: ReturnType<typeof useVerdict>["data"];
   held: bigint;
+  position: ReturnType<typeof usePosition>["data"];
 }) {
   const action = useAction();
+  // The contract's own minimums, read rather than hardcoded: duplicating them
+  // here is how a config change turns into a guaranteed revert nobody expects.
+  const { data: config } = useConfig();
   const [amount, setAmount] = useState("0.05");
   const [side, setSide] = useState<Side>("YES");
   const [argument, setArgument] = useState("");
@@ -319,7 +499,29 @@ function ActionPanel({
     }
   }, [amount]);
 
+  const minBet = BigInt(config?.min_bet_atto ?? "0");
+  const minJuror = BigInt(config?.min_juror_bond_atto ?? "0");
+  const minDispute = BigInt(config?.dispute_bond_atto ?? "0");
+
   const disabled = !action.connected || action.state === "signing" || action.state === "waiting";
+
+  // A payout cannot be claimed until the challenge window has passed - the
+  // contract refuses it, so offering the button before then is a button that
+  // always fails. Only the winning side has anything to claim, and a void
+  // market refunds both.
+  const outcome = verdict?.outcome;
+  const settled = market.status === "FINAL" || market.status === "VOID";
+  const windowOpen =
+    market.status === "RESOLVED" &&
+    Boolean(verdict) &&
+    Number(verdict!.dispute_deadline) * 1000 > Date.now();
+  const claimable =
+    market.status === "VOID"
+      ? held > 0n
+      : (settled || market.status === "RESOLVED") &&
+        !windowOpen &&
+        (outcome === "YES" || outcome === "NO") &&
+        BigInt(outcome === "YES" ? position?.yes ?? "0" : position?.no ?? "0") > 0n;
 
   return (
     <Card className="p-5">
@@ -360,7 +562,7 @@ function ActionPanel({
           <Button
             tone={side === "YES" ? "yes" : "no"}
             className="mt-3 w-full"
-            disabled={disabled || value <= 0n}
+            disabled={disabled || value < minBet || value <= 0n}
             onClick={() =>
               action.run((ctx) => placeBet(ctx, market.id, side, value), {
                 note: "Your stake mints position tokens one-for-one with the wei behind it.",
@@ -369,6 +571,11 @@ function ActionPanel({
           >
             Stake {side}
           </Button>
+          {minBet > 0n && value > 0n && value < minBet ? (
+            <p className="mt-2 text-[0.78rem] text-no">
+              The minimum stake is {genLabel(minBet.toString(), 4)}.
+            </p>
+          ) : null}
           <div className="mt-5 border-t border-line pt-4">
             <Label>Or bond a reading</Label>
             <p className="mt-1.5 text-[0.8rem] leading-relaxed text-muted">
@@ -378,11 +585,16 @@ function ActionPanel({
             <Button
               tone="ghost"
               className="mt-3 w-full"
-              disabled={disabled || value <= 0n}
+              disabled={disabled || value < minJuror || value <= 0n}
               onClick={() => action.run((ctx) => stakeJuror(ctx, market.id, side, value), { note: "Bonding a reading as a juror." })}
             >
               Bond {side} as juror
             </Button>
+            {minJuror > 0n ? (
+              <p className="mt-2 text-[0.78rem] text-muted">
+                Minimum bond {genLabel(minJuror.toString(), 4)}.
+              </p>
+            ) : null}
           </div>
         </>
       ) : null}
@@ -449,7 +661,13 @@ function ActionPanel({
           <Button
             tone="ghost"
             className="mt-3 w-full"
-            disabled={disabled || !url.startsWith("https://") || argument.trim().length < 8 || value <= 0n}
+            disabled={
+              disabled ||
+              !url.startsWith("https://") ||
+              argument.trim().length < 8 ||
+              value < minDispute ||
+              value <= 0n
+            }
             onClick={() =>
               action.run((ctx) => fileDispute(ctx, market.id, url.trim(), argument.trim(), value), {
                 note: "A failed challenge forfeits its bond to the jury.",
@@ -458,6 +676,11 @@ function ActionPanel({
           >
             Challenge the verdict
           </Button>
+          {minDispute > 0n ? (
+            <p className="mt-2 text-[0.78rem] text-muted">
+              Minimum bond {genLabel(minDispute.toString(), 4)}. A failed challenge forfeits it.
+            </p>
+          ) : null}
         </>
       ) : null}
 
@@ -472,7 +695,14 @@ function ActionPanel({
         </Button>
       ) : null}
 
-      {(market.status === "FINAL" || market.status === "VOID" || market.status === "RESOLVED") && held > 0n ? (
+      {windowOpen && held > 0n ? (
+        <p className="mt-4 border-t border-line pt-4 text-[0.82rem] leading-relaxed text-muted">
+          Settlement is open to challenge until {stamp(verdict!.dispute_deadline)}. Payouts unlock
+          once it closes — the contract refuses them before that.
+        </p>
+      ) : null}
+
+      {claimable ? (
         <div className="mt-5 border-t border-line pt-4">
           <Label>{market.status === "VOID" ? "Refund" : "Settlement"}</Label>
           <EscrowFlow state={flow} className="mt-2" />
