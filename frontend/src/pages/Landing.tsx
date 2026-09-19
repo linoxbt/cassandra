@@ -126,8 +126,10 @@ function Hero() {
               <Label>Market 0041</Label>
               <Label>crypto · CoinGecko</Label>
             </div>
+            {/* Phrased the way the contract actually settles: a recorded daily
+                price for a named date, never a spot price read at settlement. */}
             <p className="mt-3 font-display text-lg leading-snug text-ink">
-              Will Bitcoin trade above $85,900 by Friday?
+              Will Bitcoin's daily price on 19-09-2026 be above $85,900?
             </p>
             <OddsCurve yes={0.57} animate className="mt-5" />
           </div>

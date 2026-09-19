@@ -1,0 +1,11 @@
+{
+  "market_id": "1",
+  "closes_at": 1789798149,
+  "expect": "YES",
+  "settled": 76371.3617203135,
+  "threshold": 68734,
+  "open_tx": "0xa0d59db066e78b6772b2d7c496a5c3eba3b41aecdf5661e2ab7cdcb0d64ca379",
+  "bet": true,
+  "transferred": true,
+  "resolved": true
+}
