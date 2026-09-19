@@ -19,7 +19,11 @@ if (NETWORK !== "studionet") {
   process.exit(0);
 }
 
-const amount = Number(process.argv[2] ?? 1000);
+// sim_fundAccount takes WEI, not GEN. Passing 1000 quietly credits 1000 wei -
+// a balance that reads as 0.0000 GEN and fails the first payable call for a
+// reason that looks nothing like "you have no money".
+const gen = Number(process.argv[2] ?? 500);
+const amount = BigInt(gen) * 10n ** 18n;
 const rpc = chain().rpcUrls.default.http[0];
 
 async function call(method, params) {
@@ -38,11 +42,11 @@ const balance = async (address) => BigInt(await call("eth_getBalance", [address,
 for (const name of [process.env.DEPLOYER_KS ?? "cassandra-deployer", process.env.AGENT_KS ?? "cassandra-agent"]) {
   const account = await keystoreAccount(name);
   const before = await balance(account.address);
-  if (before > 0n) {
+  if (before >= amount / 2n) {
     console.log(`${name.padEnd(20)} ${account.address}  already holds ${fmtGen(before)}`);
     continue;
   }
-  await call("sim_fundAccount", [account.address, amount]);
+  await call("sim_fundAccount", [account.address, Number(amount)]);
   const after = await balance(account.address);
   console.log(`${name.padEnd(20)} ${account.address}  ${fmtGen(before)} -> ${fmtGen(after)}`);
 }
