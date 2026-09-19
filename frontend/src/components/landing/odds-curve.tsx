@@ -66,7 +66,15 @@ export function OddsCurve({
 
   return (
     <figure className={className}>
-      <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="w-full" role="img" aria-label={`${Math.round(eased * 100)}% of the pool is on yes`}>
+      {/* `h-auto` and the explicit ratio are load-bearing: with only a width the
+          SVG resolves its height against the containing block, which in the
+          market page's stretched grid cell made it hundreds of pixels tall and
+          pushed the whole card off the screen. */}
+      <svg
+        viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+        className="block h-auto w-full"
+        style={{ aspectRatio: `${WIDTH} / ${HEIGHT}` }}
+        role="img" aria-label={`${Math.round(eased * 100)}% of the pool is on yes`}>
         <defs>
           <linearGradient id="cass-yes" x1="0" x2="0" y1="0" y2="1">
             <stop offset="0%" stopColor="var(--color-yes)" stopOpacity="0.32" />
