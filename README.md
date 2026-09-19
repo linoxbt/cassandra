@@ -20,6 +20,16 @@ Cassandra was cursed to speak true prophecy that nobody believed. Here, belief i
 not optional: the verdict is whatever independent validators agree the evidence
 says, and the escrow pays out against it automatically.
 
+## Live on Studio Network
+
+| | |
+|---|---|
+| **Market** | [`0x13a8d47946411eCA180A611685713d73a831ac87`](https://explorer-studio.genlayer.com/address/0x13a8d47946411eCA180A611685713d73a831ac87) |
+| **Positions** | [`0x28C872666ceE36636aebE65c2d62A38D08e34F29`](https://explorer-studio.genlayer.com/address/0x28C872666ceE36636aebE65c2d62A38D08e34F29) |
+| **Chain** | Studio Network, 61999 — gasless |
+
+---
+
 |  |  |
 |---|---|
 | **Contracts** | [`contracts/cassandra.py`](contracts/cassandra.py) · [`contracts/positions.py`](contracts/positions.py) — GenVM / Python, no Solidity anywhere |
