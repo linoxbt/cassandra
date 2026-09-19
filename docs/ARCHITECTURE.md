@@ -192,7 +192,7 @@ contract class per process.
 
 | Suite | Host | Proves |
 |---|---|---|
-| `tests/direct` (78) | real GenVM SDK + storage encoder, one contract | the market's storage schema, every guard and transition, the consensus round against mocked web and LLM, validator agreement and divergence |
+| `tests/direct` (83) | real GenVM SDK + storage encoder, one contract | the market's storage schema, every guard and transition, the consensus round against mocked web and LLM, validator agreement and divergence |
 | `tests/positions` (15) | same, other contract | mint/burn access control and idempotency, the transfer freeze, metadata |
 | `tests/unit` (22) | in-process stub, **both contracts wired to each other** | cross-contract settlement, a transferred position paying its new holder, double-claim attempts, wei-level money conservation against a modelled balance, and that the running counters never drift |
 
