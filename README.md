@@ -37,6 +37,7 @@ says, and the escrow pays out against it automatically.
 | **Frontend** | [`frontend/`](frontend/) — Vite + React + `genlayer-js`, talking to the chain directly |
 | **Tests** | 120 across three suites — see [Testing](#testing) |
 | **Architecture** | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) |
+| **Demo video** | [`assets/cassandra-demo.mp4`](assets/cassandra-demo.mp4) — 22 seconds, with sound |
 
 ## How a market lives
 
